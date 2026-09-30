@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>旅行支出メモ</title>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 500px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    input, select, button {
+      font-size: 18px;
+      padding: 10px;
+      margin: 5px 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    #total {
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 25px;
+    }
+.delete-button {
+  width: auto;
+  font-size: 14px;
+  padding: 4px 10px;
+  margin-left: 15px;
+}
+  </style>
+</head>
+
+<body>
+
+  <h1>旅行　支出メモ</h1>
+
+  <label>分類</label>
+  <select id="category">
+    <option>食事</option>
+    <option>交通</option>
+    <option>お土産</option>
+    <option>登山</option>
+    <option>その他</option>
+  </select>
+
+  <label>金額</label>
+  <input type="number" id="amount" placeholder="例：1200">
+
+  <label>メモ</label>
+  <input type="text" id="memo" placeholder="例：昼食">
+
+  <button onclick="addExpense()">記録する</button>
+
+  <div id="total">合計：0円</div>
+
+  <section aria-labelledby="daily-heading">
+    <h2 id="daily-heading">日別合計</h2>
+    <ul id="daily-totals"></ul>
+  </section>
+
+  <section aria-labelledby="category-heading">
+    <h2 id="category-heading">分類別合計</h2>
+    <ul id="category-totals"></ul>
+  </section>
+
+  <h2>記録</h2>
+  <ul id="list"></ul>
+
+  <script>
+  // 保存済みの記録を読み込む
+  let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
+
+  function addExpense() {
+    const category = document.getElementById("category").value;
+    const amount = Number(document.getElementById("amount").value);
+    const memo = document.getElementById("memo").value;
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("金額を入力してください");
+      return;
+    }
+
+    const now = new Date();
+    // UTCではなく、端末の現地日付を保存する
+    const date = now.getFullYear() + "-" +
+      String(now.getMonth() + 1).padStart(2, "0") + "-" +
+      String(now.getDate()).padStart(2, "0");
+
+    // 新しい支出を記録に追加
+    expenses.push({
+      category: category,
+      amount: amount,
+      memo: memo,
+      date: date,
+      dateTime: now.toLocaleString("ja-JP", {
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      })
+    });
+
+    // Safariに保存
+    localStorage.setItem("expenses", JSON.stringify(expenses));
+
+    // 画面を更新
+    displayExpenses();
+
+    // 入力欄を空にする
+    document.getElementById("amount").value = "";
+    document.getElementById("memo").value = "";
+  }
+
+  // 旧データには年がないため、今年の記録と推測して混ぜない
+  function getExpenseDay(expense) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(expense.date || "")) {
+      return expense.date;
+    }
+    const match = /^(\d{1,2})\/(\d{1,2})(?:\s|$)/.exec(expense.dateTime || "");
+    return match
+      ? "年不明：" + match[1].padStart(2, "0") + "/" + match[2].padStart(2, "0")
+      : "日付不明";
+  }
+
+  function displaySummary(id, totals) {
+    const list = document.getElementById(id);
+    list.innerHTML = "";
+    if (totals.size === 0) {
+      const item = document.createElement("li");
+      item.textContent = "まだ記録がありません";
+      list.appendChild(item);
+      return;
+    }
+    totals.forEach(function(amount, label) {
+      const item = document.createElement("li");
+      item.textContent = label + "：" + amount.toLocaleString("ja-JP") + "円";
+      list.appendChild(item);
+    });
+  }
+
+  function displayExpenses() {
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+
+    let total = 0;
+    const dailyTotals = new Map();
+    const categoryTotals = new Map();
+
+    expenses.forEach(function(expense, index) {
+      total = total + expense.amount;
+      const day = getExpenseDay(expense);
+      dailyTotals.set(day, (dailyTotals.get(day) || 0) + expense.amount);
+      categoryTotals.set(expense.category,
+        (categoryTotals.get(expense.category) || 0) + expense.amount);
+
+      const item = document.createElement("li");
+
+      item.textContent =
+        (expense.dateTime ? expense.dateTime + "　" : "") +
+        expense.category + "　" +
+        expense.amount.toLocaleString() + "円　" +
+        expense.memo;
+const deleteButton = document.createElement("button");
+deleteButton.textContent = "削除";
+deleteButton.className = "delete-button";
+
+deleteButton.onclick = function() {
+  expenses.splice(index, 1);
+
+  localStorage.setItem(
+    "expenses",
+    JSON.stringify(expenses)
+  );
+
+  displayExpenses();
+};
+
+item.appendChild(deleteButton);
+
+      list.appendChild(item);
+    });
+
+    document.getElementById("total").textContent =
+      "合計：" + total.toLocaleString() + "円";
+    displaySummary("daily-totals", new Map(
+      [...dailyTotals].sort(([a], [b]) => a.localeCompare(b, "ja"))
+    ));
+    displaySummary("category-totals", categoryTotals);
+  }
+
+  // アプリを開いたときに保存済みデータを表示
+  displayExpenses();
+</script>
+
+</body>
+</html>
