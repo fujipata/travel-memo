@@ -190,10 +190,15 @@
   <select id="category">
     <option>食事</option>
     <option>交通</option>
+    <option>宿泊</option>
     <option>お土産</option>
     <option>登山</option>
+    <option>観光・参拝</option>
     <option>その他</option>
   </select>
+
+  <label for="subcategory">小分類</label>
+  <select id="subcategory"></select>
 
   <label>金額</label>
   <input type="number" id="amount" placeholder="例：1200">
@@ -241,8 +246,38 @@
   // 保存済みの記録を読み込む
   let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
 
+  const subcategories = {
+    "食事": ["外食", "コンビニ"],
+    "交通": ["ガソリン", "高速料金", "駐車場", "公共交通"],
+    "宿泊": ["ホテル", "日帰り温泉"],
+    "登山": ["登山バッジ", "入山料"],
+    "観光・参拝": ["拝観料", "御朱印", "その他"]
+  };
+
+  function updateSubcategories() {
+    const choices = subcategories[document.getElementById("category").value] || [];
+    const select = document.getElementById("subcategory");
+    select.innerHTML = "";
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = choices.length ? "選択しない" : "小分類なし";
+    select.appendChild(empty);
+    choices.forEach(label => {
+      const option = document.createElement("option");
+      option.value = label;
+      option.textContent = label;
+      select.appendChild(option);
+    });
+    select.value = "";
+    select.disabled = choices.length === 0;
+  }
+
+  document.getElementById("category").addEventListener("change", updateSubcategories);
+  updateSubcategories();
+
   function addExpense() {
     const category = document.getElementById("category").value;
+    const subcategory = document.getElementById("subcategory").value;
     const amount = Number(document.getElementById("amount").value);
     const memo = document.getElementById("memo").value;
 
@@ -260,6 +295,7 @@
     // 新しい支出を記録に追加
     const next = [...expenses, {
       category: category,
+      ...((subcategories[category] || []).includes(subcategory) ? {subcategory} : {}),
       amount: amount,
       memo: memo,
       date: date,
@@ -324,7 +360,7 @@
 
       item.textContent =
         (expense.dateTime ? expense.dateTime + "　" : "") +
-        expense.category + "　" +
+        expense.category + (expense.subcategory ? " / " + expense.subcategory : "") + "　" +
         expense.amount.toLocaleString() + "円　" +
         expense.memo;
 const deleteButton = document.createElement("button");
@@ -385,10 +421,10 @@ item.appendChild(deleteButton);
   }
 
   function makeCsv(records) {
-    const rows = [["日付", "記録日時（元の表示）", "分類", "金額（円）", "メモ"].map(v => csvCell(v)).join(",")];
+    const rows = [["日付", "記録日時（元の表示）", "分類", "金額（円）", "メモ", "小分類"].map(v => csvCell(v)).join(",")];
     records.forEach(expense => rows.push([
       csvCell(getExpenseDay(expense)), csvCell(expense.dateTime),
-      csvCell(expense.category), csvCell(expense.amount, false), csvCell(expense.memo)
+      csvCell(expense.category), csvCell(expense.amount, false), csvCell(expense.memo), csvCell(expense.subcategory)
     ].join(",")));
     return "\uFEFF" + rows.join("\r\n") + "\r\n";
   }
@@ -439,6 +475,12 @@ item.appendChild(deleteButton);
         throw new Error("記録の形式が正しくありません。");
       }
       const clean = {category: item.category, amount: item.amount, memo: item.memo};
+      if (item.subcategory !== undefined) {
+        if (typeof item.subcategory !== "string" || item.subcategory.length > 100) {
+          throw new Error("小分類の形式が正しくありません。");
+        }
+        clean.subcategory = item.subcategory;
+      }
       if (item.date !== undefined) {
         if (typeof item.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)) throw new Error("日付が正しくありません。");
         const date = new Date(item.date + "T00:00:00Z");
