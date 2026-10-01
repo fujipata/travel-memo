@@ -1,5 +1,5 @@
 // アプリ本体を変更するリリースでは、このバージョンも更新する。
-const VERSION = 'v1';
+const VERSION = 'v2';
 const BASE = new URL('./', self.location.href);
 const PREFIX = 'travel-memo:' + BASE.pathname + ':';
 const CACHE = PREFIX + VERSION;
@@ -63,3 +63,4 @@ self.addEventListener('fetch', event => {
     return response;
   })());
 });
+
