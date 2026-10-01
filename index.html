@@ -88,6 +88,23 @@
       line-height: 1.5;
     }
 
+    .input-card input,
+    .input-card select {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: 48px;
+      min-height: 48px;
+      margin-bottom: 8px;
+      box-sizing: border-box;
+    }
+
+    .input-card input[type="date"],
+    .input-card input[type="time"] {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
     input, select { color: #252f3d; background: #f8fafc; }
     input::placeholder { color: #6b7785; opacity: 1; }
     #amount { font-variant-numeric: tabular-nums; }
