@@ -21,6 +21,36 @@ function harness(records=fixtures, storage=new Map()) {
   const ctx=vm.createContext(env); vm.runInContext(source,ctx);
   return {ctx,els,storage,env,downloads,shared,alerts};
 }
+// Subcategories must survive storage/export/restore without changing legacy records or totals.
+{
+ const h=harness(), c=h.ctx;
+ h.env.document.getElementById('amount');h.env.document.getElementById('memo');
+ const expected={'食事':['外食','コンビニ'],'交通':['ガソリン','高速料金','駐車場','公共交通'],'宿泊':['ホテル','日帰り温泉'],'登山':['登山バッジ','入山料'],'観光・参拝':['拝観料','御朱印','その他'],'お土産':[],'その他':[]};
+ for(const [category,choices] of Object.entries(expected)) {
+  h.els.category.value=category;c.updateSubcategories();
+  assert.deepEqual(h.els.subcategory.children.map(x=>x.value),['',...choices]);
+  assert.equal(h.els.subcategory.value,'');
+  assert.equal(h.els.subcategory.disabled,choices.length===0);
+  for(const subcategory of choices) {
+   h.els.subcategory.value=subcategory;h.els.amount.value='100';h.els.memo.value='分類確認';c.addExpense();
+   const records=JSON.parse(h.storage.get('expenses'));
+   assert.equal(records.at(-1).subcategory,subcategory);
+   assert.equal(records.at(-1).category,category);
+   assert(h.els.list.children.at(-1).textContent.includes(category+' / '+subcategory));
+   assert.deepEqual(JSON.parse(JSON.stringify(c.parseBackup(c.makeBackup(records)))),records);
+   assert(c.makeCsv(records).includes('"'+subcategory+'"'));
+  }
+ }
+ assert.equal(h.els.total.textContent,'合計：3,450円');
+ assert(h.els['category-totals'].children.some(x=>x.textContent==='食事：1,500円'));
+ assert.deepEqual(JSON.parse(h.storage.get('expenses')).slice(0,4),fixtures);
+ h.els.category.value='食事';c.updateSubcategories();h.els.subcategory.value='ホテル';h.els.amount.value='100';c.addExpense();
+ assert.equal(JSON.parse(h.storage.get('expenses')).at(-1).subcategory,undefined);
+ for(const subcategory of [null,42,{},'x'.repeat(101)]) assert.throws(()=>c.parseBackup(c.makeBackup([{...fixtures[0],subcategory}])));
+ const selected=[{...fixtures[0],subcategory:'外食'}];
+ const reloaded=harness(selected);assert(reloaded.els.list.children[0].textContent.includes('食事 / 外食'));
+ console.log('PASS: all 13 subcategories; reset/disabled states; storage/reload/backup/CSV; legacy records; unchanged category totals; invalid subcategory handling.');
+}
 (async()=>{
  let h=harness(),c=h.ctx;
  const original=h.storage.get('expenses');
