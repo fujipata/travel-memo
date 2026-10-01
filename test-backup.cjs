@@ -21,6 +21,9 @@ function harness(records=fixtures, storage=new Map()) {
   const ctx=vm.createContext(env); vm.runInContext(source,ctx);
   return {ctx,els,storage,env,downloads,shared,alerts};
 }
+function cards(h) {
+ return h.els.list.children.flatMap(group => group.children[0].children[1].children);
+}
 // Subcategories must survive storage/export/restore without changing legacy records or totals.
 {
  const h=harness(), c=h.ctx;
@@ -36,7 +39,7 @@ function harness(records=fixtures, storage=new Map()) {
    const records=JSON.parse(h.storage.get('expenses'));
    assert.equal(records.at(-1).subcategory,subcategory);
    assert.equal(records.at(-1).category,category);
-   assert(h.els.list.children.at(-1).textContent.includes(category+' / '+subcategory));
+   assert(cards(h).some(item => item.textContent.includes(category+' / '+subcategory)));
    assert.deepEqual(JSON.parse(JSON.stringify(c.parseBackup(c.makeBackup(records)))),records);
    assert(c.makeCsv(records).includes('"'+subcategory+'"'));
   }
@@ -48,7 +51,7 @@ function harness(records=fixtures, storage=new Map()) {
  assert.equal(JSON.parse(h.storage.get('expenses')).at(-1).subcategory,undefined);
  for(const subcategory of [null,42,{},'x'.repeat(101)]) assert.throws(()=>c.parseBackup(c.makeBackup([{...fixtures[0],subcategory}])));
  const selected=[{...fixtures[0],subcategory:'外食'}];
- const reloaded=harness(selected);assert(reloaded.els.list.children[0].textContent.includes('食事 / 外食'));
+ const reloaded=harness(selected);assert(cards(reloaded)[0].textContent.includes('食事 / 外食'));
  console.log('PASS: all 13 subcategories; reset/disabled states; storage/reload/backup/CSV; legacy records; unchanged category totals; invalid subcategory handling.');
 }
 (async()=>{
@@ -75,6 +78,6 @@ function harness(records=fixtures, storage=new Map()) {
  h.env.navigator.share=async()=>{const e=Error();e.name='AbortError';throw e};await c.exportRecords('csv');assert(h.els['data-status'].textContent.includes('キャンセル'));
  h.env.navigator.canShare=()=>false;await c.exportRecords('csv');assert(h.downloads[0].endsWith('.csv'));
  h.env.failKey='expenses';h.env.document.getElementById('amount').value='250';h.env.document.getElementById('category').value='食事';c.addExpense();assert.equal(h.els.total.textContent,'合計：2,150円');
- h.env.failKey=null;c.addExpense();assert.equal(h.els.total.textContent,'合計：2,400円');h.els.list.children.at(-1).children[0].onclick();assert.equal(h.els.total.textContent,'合計：2,150円');
+ h.env.failKey=null;c.addExpense();assert.equal(h.els.total.textContent,'合計：2,400円');cards(h).find(item => item.textContent.includes('250円')).children[0].onclick();assert.equal(h.els.total.textContent,'合計：2,150円');
  console.log('PASS: CSV quoting/BOM/formula protection; backup round-trip; invalid/oversized input; restore preview/cancel; storage failure; restore/undo across reload; empty restore; stale reads; sharing/cancellation/download; add/delete regression.');
 })().catch(e=>{console.error(e);process.exitCode=1});

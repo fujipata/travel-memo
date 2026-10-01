@@ -133,6 +133,24 @@
     li + li { border-top: 1px solid #e8eef4; }
     #list:empty { border: 0; box-shadow: none; }
 
+    #list > .day-group { padding: 0; }
+    .day-group summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px;
+      cursor: pointer;
+      list-style: none;
+      font-weight: 600;
+    }
+    .day-group summary::-webkit-details-marker { display: none; }
+    .day-group summary::after { content: "▶"; font-size: 12px; }
+    .day-group details[open] > summary::after { content: "▼"; }
+    .day-group summary:focus-visible { outline: 3px solid #0873d1; outline-offset: -3px; }
+    .day-total { margin-left: auto; text-align: right; }
+    .day-records { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+    .day-records > li:first-child { border-top: 1px solid #e8eef4; }
+
     .delete-button {
       display: block;
       width: auto;
@@ -206,6 +224,12 @@
   <label>メモ</label>
   <input type="text" id="memo" placeholder="例：昼食">
 
+  <label for="expense-date">日付</label>
+  <input type="date" id="expense-date" required>
+
+  <label for="expense-time">時刻</label>
+  <input type="time" id="expense-time" required>
+
   <button onclick="addExpense()">記録する</button>
   </div>
 
@@ -275,6 +299,27 @@
   document.getElementById("category").addEventListener("change", updateSubcategories);
   updateSubcategories();
 
+  function localDate(date) {
+    return date.getFullYear() + "-" +
+      String(date.getMonth() + 1).padStart(2, "0") + "-" +
+      String(date.getDate()).padStart(2, "0");
+  }
+
+  let customDateTime = false;
+  function resetDateTime() {
+    const now = new Date();
+    document.getElementById("expense-date").value = localDate(now);
+    document.getElementById("expense-time").value =
+      String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+    customDateTime = false;
+  }
+  ["expense-date", "expense-time"].forEach(id => {
+    document.getElementById(id).addEventListener("input", () => { customDateTime = true; });
+  });
+  resetDateTime();
+
+  const dayOpenStates = new Map();
+
   function addExpense() {
     const category = document.getElementById("category").value;
     const subcategory = document.getElementById("subcategory").value;
@@ -286,11 +331,17 @@
       return;
     }
 
-    const now = new Date();
-    // UTCではなく、端末の現地日付を保存する
-    const date = now.getFullYear() + "-" +
-      String(now.getMonth() + 1).padStart(2, "0") + "-" +
-      String(now.getDate()).padStart(2, "0");
+    // 日時を変更していない場合は、登録時点の現在日時を使う。
+    if (!customDateTime) resetDateTime();
+    const dateInput = document.getElementById("expense-date");
+    const timeInput = document.getElementById("expense-time");
+    const date = dateInput.value;
+    const now = new Date(date + "T" + timeInput.value);
+    if (!date || !timeInput.value || !Number.isFinite(now.getTime()) ||
+        localDate(now) !== date) {
+      alert("日付と時刻を入力してください");
+      return;
+    }
 
     // 新しい支出を記録に追加
     const next = [...expenses, {
@@ -312,6 +363,7 @@
     // 入力欄を空にする
     document.getElementById("amount").value = "";
     document.getElementById("memo").value = "";
+    resetDateTime();
   }
 
   // 旧データには年がないため、今年の記録と推測して混ぜない
@@ -348,6 +400,7 @@
     let total = 0;
     const dailyTotals = new Map();
     const categoryTotals = new Map();
+    const dayRecords = new Map();
 
     expenses.forEach(function(expense, index) {
       total = total + expense.amount;
@@ -373,7 +426,34 @@ deleteButton.onclick = function() {
 
 item.appendChild(deleteButton);
 
-      list.appendChild(item);
+      if (!dayRecords.has(day)) dayRecords.set(day, []);
+      dayRecords.get(day).push(item);
+    });
+
+    [...dayRecords].sort(([a], [b]) => b.localeCompare(a, "ja")).forEach(([day, items]) => {
+      const group = document.createElement("li");
+      group.className = "day-group";
+      const details = document.createElement("details");
+      details.open = dayOpenStates.has(day) ? dayOpenStates.get(day) : day === localDate(new Date());
+      details.addEventListener("toggle", () => { dayOpenStates.set(day, details.open); });
+      const summary = document.createElement("summary");
+      const label = document.createElement("span");
+      label.textContent = /^\d{4}-\d{2}-\d{2}$/.test(day)
+        ? new Date(day + "T00:00:00").toLocaleDateString("ja-JP", {
+          year: "numeric", month: "numeric", day: "numeric", weekday: "short"
+        }) : day;
+      const amount = document.createElement("span");
+      amount.className = "day-total";
+      amount.textContent = "合計 " + dailyTotals.get(day).toLocaleString("ja-JP") + "円";
+      summary.appendChild(label);
+      summary.appendChild(amount);
+      details.appendChild(summary);
+      const records = document.createElement("ul");
+      records.className = "day-records";
+      items.forEach(item => records.appendChild(item));
+      details.appendChild(records);
+      group.appendChild(details);
+      list.appendChild(group);
     });
 
     document.getElementById("total").textContent =
