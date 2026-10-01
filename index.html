@@ -186,7 +186,7 @@
   </section>
 
   <div class="input-card">
-  <label>分類</label>
+  <label>大分類</label>
   <select id="category">
     <option>食事</option>
     <option>交通</option>
@@ -421,10 +421,10 @@ item.appendChild(deleteButton);
   }
 
   function makeCsv(records) {
-    const rows = [["日付", "記録日時（元の表示）", "分類", "金額（円）", "メモ", "小分類"].map(v => csvCell(v)).join(",")];
+    const rows = [["日付", "記録日時（元の表示）", "大分類", "小分類", "金額（円）", "メモ"].map(v => csvCell(v)).join(",")];
     records.forEach(expense => rows.push([
       csvCell(getExpenseDay(expense)), csvCell(expense.dateTime),
-      csvCell(expense.category), csvCell(expense.amount, false), csvCell(expense.memo), csvCell(expense.subcategory)
+      csvCell(expense.category), csvCell(expense.subcategory), csvCell(expense.amount, false), csvCell(expense.memo)
     ].join(",")));
     return "\uFEFF" + rows.join("\r\n") + "\r\n";
   }
