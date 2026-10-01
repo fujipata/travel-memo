@@ -163,6 +163,20 @@
       border-color: #f5dce0;
     }
 
+    #delete-all-button { margin: 0 0 24px auto; }
+    #delete-all-dialog {
+      width: calc(100% - 40px);
+      max-width: 360px;
+      padding: 24px;
+      border: 1px solid #e3ebf2;
+      border-radius: 16px;
+      color: #252f3d;
+      background: #fff;
+    }
+    #delete-all-dialog::backdrop { background: rgb(0 0 0 / 35%); }
+    #delete-all-dialog h2 { margin: 0 0 12px; }
+    #delete-all-dialog .delete-button { width: 100%; margin: 8px 0 0; }
+
     section[aria-labelledby="data-heading"] h2 { margin: 0 0 16px; }
     #restore-file { font-size: 16px; padding: 8px; }
     #restore-file::file-selector-button {
@@ -247,6 +261,14 @@
 
   <h2>記録</h2>
   <ul id="list"></ul>
+  <button id="delete-all-button" class="delete-button" type="button" onclick="startDeleteAll()">すべての記録を削除</button>
+
+  <dialog id="delete-all-dialog" aria-labelledby="delete-all-title" aria-describedby="delete-all-message">
+    <h2 id="delete-all-title"></h2>
+    <p id="delete-all-message"></p>
+    <button id="delete-all-cancel" type="button" onclick="document.getElementById('delete-all-dialog').close()" autofocus>キャンセル</button>
+    <button id="delete-all-confirm" class="delete-button" type="button" onclick="confirmDeleteAll()"></button>
+  </dialog>
 
   <section aria-labelledby="data-heading">
     <h2 id="data-heading">記録の保存・復元</h2>
@@ -468,6 +490,34 @@ item.appendChild(deleteButton);
   const RECOVERY_KEY = "expenses-before-restore";
   let pendingRestore = null;
   let restoreReadId = 0;
+
+  let deleteAllStep = 0;
+
+  function startDeleteAll() {
+    deleteAllStep = 1;
+    document.getElementById("delete-all-title").textContent = "すべての記録を削除しますか？";
+    document.getElementById("delete-all-message").textContent =
+      "この操作を行うと、現在保存されている支出記録がすべて削除されます。集計やバックアップが完了していることを確認してください。";
+    document.getElementById("delete-all-confirm").textContent = "削除へ進む";
+    document.getElementById("delete-all-dialog").showModal();
+  }
+
+  function confirmDeleteAll() {
+    const dialog = document.getElementById("delete-all-dialog");
+    if (!dialog.open) return;
+    if (deleteAllStep === 1) {
+      deleteAllStep = 2;
+      document.getElementById("delete-all-title").textContent = "最終確認";
+      document.getElementById("delete-all-message").textContent = "削除した記録は元に戻せません。";
+      document.getElementById("delete-all-confirm").textContent = "すべて削除";
+      document.getElementById("delete-all-cancel").focus();
+      return;
+    }
+    if (deleteAllStep !== 2) return;
+    deleteAllStep = 0;
+    dialog.close();
+    saveExpenses([]);
+  }
 
   function setDataStatus(message) {
     document.getElementById("data-status").textContent = message;
