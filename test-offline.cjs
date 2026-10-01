@@ -36,9 +36,9 @@ function ui({controller=true,ready=true,waiting=false,unsupported=false}={}) {
  w.env.offline=true;for(const url of [base,base+'?from=home',base+'index.html',base+'index.html?q=1',base+'offline.js'])assert((await w.fetchEvent(url)).ok);
  assert.equal(await w.fetchEvent('https://example.test/another/'),undefined);assert.equal(await w.fetchEvent(base+'backup.json'),undefined);assert.equal(await w.fetchEvent(base,'navigate','POST'),undefined);assert.equal(await w.fetchEvent('https://elsewhere.test/travel-memo/'),undefined);
  let message;await w.event('message',{data:{type:'CHECK_OFFLINE'},ports:[{postMessage:m=>message=m}]});assert(message.ready);
- w.stores.get('travel-memo:/travel-memo/:v1').delete(base+'offline.js');await w.event('message',{data:{type:'CHECK_OFFLINE'},ports:[{postMessage:m=>message=m}]});assert.equal(message.ready,false);
+ w.stores.get('travel-memo:/travel-memo/:v2').delete(base+'offline.js');await w.event('message',{data:{type:'CHECK_OFFLINE'},ports:[{postMessage:m=>message=m}]});assert.equal(message.ready,false);
  w.env.offline=false;assert((await w.fetchEvent(base+'offline.js','cors')).ok);await w.event('message',{data:{type:'ACTIVATE_UPDATE'},ports:[]});assert(w.env.skipped);
- w=worker();w.stores.set('travel-memo:/travel-memo/:v0',new Map([['old','preserved']]));w.env.offline=true;await assert.rejects(w.event('install'));assert(w.stores.has('travel-memo:/travel-memo/:v0'));assert.equal(w.stores.get('travel-memo:/travel-memo/:v1').size,0);
+ w=worker();w.stores.set('travel-memo:/travel-memo/:v0',new Map([['old','preserved']]));w.env.offline=true;await assert.rejects(w.event('install'));assert(w.stores.has('travel-memo:/travel-memo/:v0'));assert.equal(w.stores.get('travel-memo:/travel-memo/:v2').size,0);
  const tick=()=>new Promise(r=>setImmediate(r));
  let u=ui();await tick();assert(u.els['offline-status'].textContent.includes('準備ができました'));assert(!u.env.reloaded);
  u.env.navigator.onLine=false;u.events.offline();assert(u.els['connection-status'].textContent.includes('オフライン'));assert(u.els['offline-status'].textContent.includes('準備ができました'));
@@ -49,3 +49,4 @@ function ui({controller=true,ready=true,waiting=false,unsupported=false}={}) {
  u=ui();await tick();u.events.controllerchange();assert(!u.env.reloaded);u.env.failUpdate=true;await u.els['check-update'].listeners.click();assert(u.els['update-status'].textContent.includes('確認できません'));assert.equal(u.els['check-update'].disabled,false);
  console.log('PASS: precache; offline root/index/query/JS; scoped cleanup; excluded requests; missing-cache readiness/repair; failed install preserves old cache; explicit activation; readiness UI; unsupported mode; update/cancel/input guard; no forced reload; offline update failure.');
 })().catch(e=>{console.error(e);process.exitCode=1});
+
