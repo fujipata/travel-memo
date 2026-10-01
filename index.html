@@ -75,6 +75,24 @@
   <h2>記録</h2>
   <ul id="list"></ul>
 
+  <section aria-labelledby="data-heading">
+    <h2 id="data-heading">記録の保存・復元</h2>
+    <button type="button" onclick="exportRecords('csv')">CSVを書き出す（集計用）</button>
+    <button type="button" onclick="exportRecords('backup')">バックアップを保存する</button>
+    <p>iPhoneでは共有画面の「ファイルに保存」を選んでください。CSVは表計算用、バックアップはこのアプリへの復元用です。</p>
+    <p>ファイルには支出とメモが含まれます。保存できたことを「ファイル」アプリで確認してください。</p>
+    <label for="restore-file">バックアップから復元（JSONファイル）</label>
+    <input id="restore-file" type="file" accept=".json,application/json">
+    <p>復元は現在の記録を置き換えます。先に今の記録もバックアップしてください。CSVからの復元には対応していません。</p>
+    <div id="restore-preview" hidden>
+      <p id="restore-summary"></p>
+      <button type="button" onclick="applyRestore()">この内容で置き換える</button>
+      <button type="button" onclick="cancelRestore()">キャンセル</button>
+    </div>
+    <button id="undo-restore" type="button" onclick="undoRestore()" hidden>復元前の記録に戻す</button>
+    <p id="data-status" role="status" aria-live="polite"></p>
+  </section>
+
   <script>
   // 保存済みの記録を読み込む
   let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
@@ -96,7 +114,7 @@
       String(now.getDate()).padStart(2, "0");
 
     // 新しい支出を記録に追加
-    expenses.push({
+    const next = [...expenses, {
       category: category,
       amount: amount,
       memo: memo,
@@ -107,13 +125,9 @@
         hour: "2-digit",
         minute: "2-digit"
       })
-    });
+    }];
 
-    // Safariに保存
-    localStorage.setItem("expenses", JSON.stringify(expenses));
-
-    // 画面を更新
-    displayExpenses();
+    if (!saveExpenses(next)) return;
 
     // 入力欄を空にする
     document.getElementById("amount").value = "";
@@ -174,14 +188,7 @@ deleteButton.textContent = "削除";
 deleteButton.className = "delete-button";
 
 deleteButton.onclick = function() {
-  expenses.splice(index, 1);
-
-  localStorage.setItem(
-    "expenses",
-    JSON.stringify(expenses)
-  );
-
-  displayExpenses();
+  saveExpenses(expenses.filter((_, itemIndex) => itemIndex !== index));
 };
 
 item.appendChild(deleteButton);
@@ -195,6 +202,176 @@ item.appendChild(deleteButton);
       [...dailyTotals].sort(([a], [b]) => a.localeCompare(b, "ja"))
     ));
     displaySummary("category-totals", categoryTotals);
+  }
+
+  const BACKUP_APP = "travel-memo";
+  const RECOVERY_KEY = "expenses-before-restore";
+  let pendingRestore = null;
+  let restoreReadId = 0;
+
+  function setDataStatus(message) {
+    document.getElementById("data-status").textContent = message;
+  }
+
+  function saveExpenses(next) {
+    try {
+      localStorage.setItem("expenses", JSON.stringify(next));
+    } catch (error) {
+      alert("保存できませんでした。空き容量やブラウザーの設定を確認してください。記録は変更していません。");
+      return false;
+    }
+    expenses = next;
+    displayExpenses();
+    return true;
+  }
+
+  function fileStamp() {
+    const now = new Date();
+    return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") +
+      "-" + String(now.getDate()).padStart(2, "0") + "-" +
+      String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0") +
+      String(now.getSeconds()).padStart(2, "0");
+  }
+
+  // メモなどを表計算ソフトの数式として実行させない
+  function csvCell(value, protectFormula = true) {
+    let text = String(value == null ? "" : value);
+    if (protectFormula && /^[\s\uFEFF]*[=+\-@]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  }
+
+  function makeCsv(records) {
+    const rows = [["日付", "記録日時（元の表示）", "分類", "金額（円）", "メモ"].map(v => csvCell(v)).join(",")];
+    records.forEach(expense => rows.push([
+      csvCell(getExpenseDay(expense)), csvCell(expense.dateTime),
+      csvCell(expense.category), csvCell(expense.amount, false), csvCell(expense.memo)
+    ].join(",")));
+    return "\uFEFF" + rows.join("\r\n") + "\r\n";
+  }
+
+  function makeBackup(records) {
+    return JSON.stringify({app: BACKUP_APP, version: 1, exportedAt: new Date().toISOString(), expenses: records}, null, 2);
+  }
+
+  async function exportRecords(kind) {
+    const isCsv = kind === "csv";
+    const file = new File([isCsv ? makeCsv(expenses) : makeBackup(expenses)],
+      "travel-memo-" + fileStamp() + (isCsv ? ".csv" : ".json"),
+      {type: isCsv ? "text/csv;charset=utf-8" : "application/json"});
+    try {
+      if (navigator.canShare && navigator.canShare({files: [file]})) {
+        await navigator.share({files: [file]});
+        setDataStatus("共有画面を閉じました。「ファイル」アプリなどで保存先を確認してください。");
+      } else {
+        const url = URL.createObjectURL(file);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        setDataStatus("書き出しを開始しました。ダウンロード先にファイルがあることを確認してください。");
+      }
+    } catch (error) {
+      setDataStatus(error.name === "AbortError" ? "書き出しをキャンセルしました。記録は変更していません。" :
+        "書き出しができませんでした。もう一度お試しください。");
+    }
+  }
+
+  function parseBackup(text) {
+    const data = JSON.parse(text);
+    if (!data || data.app !== BACKUP_APP || data.version !== 1 ||
+        !Array.isArray(data.expenses) || data.expenses.length > 10000) {
+      throw new Error("このアプリのバックアップではありません。");
+    }
+    return data.expenses.map(item => {
+      if (!item || typeof item !== "object" ||
+          typeof item.category !== "string" || !item.category.trim() || item.category.length > 100 ||
+          typeof item.amount !== "number" || !Number.isFinite(item.amount) || item.amount <= 0 ||
+          item.amount > Number.MAX_SAFE_INTEGER ||
+          typeof item.memo !== "string" || item.memo.length > 100000 ||
+          (item.dateTime !== undefined && (typeof item.dateTime !== "string" || item.dateTime.length > 100))) {
+        throw new Error("記録の形式が正しくありません。");
+      }
+      const clean = {category: item.category, amount: item.amount, memo: item.memo};
+      if (item.date !== undefined) {
+        if (typeof item.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)) throw new Error("日付が正しくありません。");
+        const date = new Date(item.date + "T00:00:00Z");
+        if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== item.date) throw new Error("日付が正しくありません。");
+        clean.date = item.date;
+      }
+      if (item.dateTime !== undefined) clean.dateTime = item.dateTime;
+      return clean;
+    });
+  }
+
+  function cancelRestore() {
+    restoreReadId++;
+    pendingRestore = null;
+    document.getElementById("restore-file").value = "";
+    document.getElementById("restore-preview").hidden = true;
+  }
+
+  async function previewRestore(event) {
+    const file = event.target.files[0];
+    const readId = ++restoreReadId;
+    pendingRestore = null;
+    document.getElementById("restore-preview").hidden = true;
+    if (!file) return;
+    try {
+      if (file.size > 5 * 1024 * 1024) throw new Error("ファイルは5MB以下にしてください。");
+      const text = await file.text();
+      if (readId !== restoreReadId) return;
+      const records = parseBackup(text);
+      pendingRestore = records;
+      const total = records.reduce((sum, item) => sum + item.amount, 0);
+      if (!Number.isFinite(total) || total > Number.MAX_SAFE_INTEGER) throw new Error("合計金額が大きすぎます。");
+      document.getElementById("restore-summary").textContent =
+        records.length + "件・合計" + total.toLocaleString("ja-JP") + "円の記録で、現在の記録をすべて置き換えます。追加ではありません。";
+      document.getElementById("restore-preview").hidden = false;
+      setDataStatus("内容を確認し、復元する場合は「この内容で置き換える」を押してください。");
+    } catch (error) {
+      if (readId !== restoreReadId) return;
+      pendingRestore = null;
+      document.getElementById("restore-file").value = "";
+      setDataStatus("読み込めませんでした。このアプリで保存したバックアップ（JSON）を選んでください。記録は変更していません。");
+    }
+  }
+
+  function applyRestore() {
+    if (pendingRestore === null) return;
+    if (!confirm("現在の" + expenses.length + "件を、バックアップの" + pendingRestore.length + "件に置き換えますか？")) return;
+    try {
+      // 現在の記録を保存できない場合は、置き換えを行わない
+      localStorage.setItem(RECOVERY_KEY, makeBackup(expenses));
+    } catch (error) {
+      setDataStatus("復元前の記録を保存できないため、置き換えを中止しました。");
+      return;
+    }
+    document.getElementById("undo-restore").hidden = false;
+    if (!saveExpenses(pendingRestore)) return;
+    cancelRestore();
+    setDataStatus("復元しました。直前の記録へ戻すボタンも利用できます。");
+  }
+
+  function undoRestore() {
+    try {
+      const records = parseBackup(localStorage.getItem(RECOVERY_KEY));
+      if (!confirm("現在の記録を、復元する直前の" + records.length + "件に戻しますか？復元後に追加した記録も置き換わります。")) return;
+      if (!saveExpenses(records)) return;
+      cancelRestore();
+      setDataStatus("復元する直前の記録に戻しました。");
+    } catch (error) {
+      setDataStatus("復元前の記録を読み込めませんでした。現在の記録は変更していません。");
+    }
+  }
+
+  document.getElementById("restore-file").addEventListener("change", previewRestore);
+  try {
+    document.getElementById("undo-restore").hidden = !localStorage.getItem(RECOVERY_KEY);
+  } catch (error) {
+    setDataStatus("ブラウザーの保存領域を利用できません。");
   }
 
   // アプリを開いたときに保存済みデータを表示
