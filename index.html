@@ -37,11 +37,19 @@
   margin-left: 15px;
 }
   </style>
+  <script src="./offline.js" defer></script>
 </head>
 
 <body>
 
   <h1>旅行　支出メモ</h1>
+  <section aria-label="オフライン利用">
+    <p id="offline-status" role="status">オフライン利用の準備を確認しています。</p>
+    <p id="connection-status"></p>
+    <button id="check-update" type="button">アプリの更新を確認</button>
+    <button id="apply-update" type="button" hidden>新しい版へ更新する</button>
+    <p id="update-status" role="status"></p>
+  </section>
 
   <label>分類</label>
   <select id="category">
