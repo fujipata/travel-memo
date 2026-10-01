@@ -571,7 +571,19 @@ item.appendChild(deleteButton);
       "travel-memo-" + fileStamp() + (isCsv ? ".csv" : ".json"),
       {type: isCsv ? "text/csv;charset=utf-8" : "application/json"});
     try {
-      if (navigator.canShare && navigator.canShare({files: [file]})) {
+      // Only Mac backups change policy; iPadOS can report MacIntel, so exclude it.
+      const saveOnMac = !isCsv && /Mac/.test(navigator.platform || "") &&
+        !(navigator.maxTouchPoints > 1);
+      if (saveOnMac && typeof globalThis.showSaveFilePicker === "function") {
+        const handle = await globalThis.showSaveFilePicker({
+          suggestedName: file.name,
+          types: [{description: "JSON", accept: {"application/json": [".json"]}}]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(file);
+        await writable.close();
+        setDataStatus("バックアップを保存しました。");
+      } else if (!saveOnMac && navigator.canShare && navigator.canShare({files: [file]})) {
         await navigator.share({files: [file]});
         setDataStatus("共有画面を閉じました。「ファイル」アプリなどで保存先を確認してください。");
       } else {

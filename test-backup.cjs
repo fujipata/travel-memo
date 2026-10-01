@@ -80,4 +80,69 @@ function cards(h) {
  h.env.failKey='expenses';h.env.document.getElementById('amount').value='250';h.env.document.getElementById('category').value='食事';c.addExpense();assert.equal(h.els.total.textContent,'合計：2,150円');
  h.env.failKey=null;c.addExpense();assert.equal(h.els.total.textContent,'合計：2,400円');cards(h).find(item => item.textContent.includes('250円')).children[0].onclick();assert.equal(h.els.total.textContent,'合計：2,150円');
  console.log('PASS: CSV quoting/BOM/formula protection; backup round-trip; invalid/oversized input; restore preview/cancel; storage failure; restore/undo across reload; empty restore; stale reads; sharing/cancellation/download; add/delete regression.');
+
+ // Mac backup routing must not change mobile sharing, CSV, or stored records.
+ for (const [platform,maxTouchPoints] of [['iPhone',5],['iPad',5],['MacIntel',5],['Win32',0],['Linux armv8l',5]]) {
+  const mobile=harness();
+  Object.assign(mobile.env.navigator,{platform,maxTouchPoints});
+  mobile.env.showSaveFilePicker=()=>assert.fail('Existing sharing flow must remain');
+  await mobile.ctx.exportRecords('backup');
+  assert.equal(mobile.shared.length,1);
+  assert.equal(mobile.downloads.length,0);
+  assert.deepEqual(JSON.parse(await mobile.shared[0].files[0].text()).expenses,fixtures);
+ }
+ for (const picker of [undefined,null]) {
+  const mac=harness();
+  Object.assign(mac.env.navigator,{platform:'MacIntel',maxTouchPoints:0});
+  mac.env.showSaveFilePicker=picker;
+  let downloaded,revoked;
+  mac.env.URL.createObjectURL=file=>{downloaded=file;return 'blob:backup'};
+  mac.env.URL.revokeObjectURL=url=>{revoked=url};
+  mac.env.navigator.canShare=()=>assert.fail('Mac backup must bypass sharing');
+  await mac.ctx.exportRecords('backup');
+  assert.equal(mac.shared.length,0);
+  assert.match(mac.downloads[0],/^travel-memo-.*\.json$/);
+  assert.equal(downloaded.type,'application/json');
+  assert.deepEqual(JSON.parse(await downloaded.text()).expenses,fixtures);
+  assert.equal(revoked,'blob:backup');
+  assert.equal(mac.storage.get('expenses'),original);
+ }
+ const mac=harness();
+ Object.assign(mac.env.navigator,{platform:'MacIntel',maxTouchPoints:0});
+ const calls=[];
+ mac.env.showSaveFilePicker=async options=>{
+  calls.push('picker');
+  assert.match(options.suggestedName,/\.json$/);
+  assert.equal(options.types[0].accept['application/json'][0],'.json');
+  return {createWritable:async()=>({write:async file=>{
+   calls.push('write');assert.deepEqual(JSON.parse(await file.text()).expenses,fixtures);
+  },close:async()=>calls.push('close')})};
+ };
+ const saving=mac.ctx.exportRecords('backup');
+ assert.deepEqual(calls,['picker']); // Invoke while the button's user activation is live.
+ await saving;
+ assert.deepEqual(calls,['picker','write','close']);
+ assert(mac.els['data-status'].textContent.includes('保存しました'));
+ for(const stage of ['picker','createWritable','write','close']) {
+  for(const name of ['AbortError','NotAllowedError']) {
+   const fail=()=>{throw Object.assign(Error('test'),{name})};
+   mac.env.showSaveFilePicker=async()=>{
+    if(stage==='picker')fail();
+    return {createWritable:async()=>{
+     if(stage==='createWritable')fail();
+     return {write:async()=>{if(stage==='write')fail()},close:async()=>{if(stage==='close')fail()}};
+    }};
+   };
+   await mac.ctx.exportRecords('backup');
+   assert(mac.els['data-status'].textContent.includes(name==='AbortError'?'キャンセル':'できませんでした'));
+   assert.equal(mac.downloads.length,0);
+   assert.equal(mac.shared.length,0);
+   assert.equal(mac.storage.get('expenses'),original);
+  }
+ }
+ mac.env.showSaveFilePicker=()=>assert.fail('CSV flow must remain unchanged');
+ await mac.ctx.exportRecords('csv');
+ assert.equal(mac.shared.length,1);
+ assert.match(mac.shared[0].files[0].name,/\.csv$/);
+ console.log('PASS: Mac picker/write/close; Mac download without picker; cancellation and failures; unchanged iPhone/iPad/other-platform sharing, CSV, backup contents and stored records.');
 })().catch(e=>{console.error(e);process.exitCode=1});
