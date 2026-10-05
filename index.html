@@ -182,6 +182,10 @@
       border-color: #f5dce0;
     }
 
+    .day-records .delete-button, .edit-button { display: inline-block; width: auto; margin: 10px 8px 0 0; min-height: 44px; padding: 9px 16px; font-size: 14px; }
+    #edit-dialog { width: min(440px, calc(100% - 48px)); max-height: 85vh; overflow: auto; border: 0; border-radius: 16px; padding: 20px; }
+    #edit-dialog::backdrop { background: rgb(0 0 0 / 35%); }
+
     #delete-all-button { margin: 0 0 24px auto; }
     #delete-all-dialog {
       width: calc(100% - 40px);
@@ -281,6 +285,25 @@
   <h2>記録</h2>
   <ul id="list"></ul>
   <button id="delete-all-button" class="delete-button" type="button" onclick="startDeleteAll()">すべての記録を削除</button>
+
+  <dialog id="edit-dialog" aria-labelledby="edit-title">
+    <h2 id="edit-title">記録を修正</h2>
+    <label for="edit-category">分類</label>
+    <select id="edit-category" onchange="updateEditSubcategories()"></select>
+    <label for="edit-subcategory">小分類</label>
+    <select id="edit-subcategory"></select>
+    <label for="edit-amount">金額</label>
+    <input type="number" id="edit-amount" min="0" step="any">
+    <label for="edit-memo">メモ</label>
+    <input type="text" id="edit-memo">
+    <label for="edit-date">日付</label>
+    <input type="date" id="edit-date">
+    <label for="edit-time">時刻</label>
+    <input type="time" id="edit-time">
+    <p id="edit-date-note"></p>
+    <button type="button" onclick="updateExpense()">更新</button>
+    <button type="button" onclick="document.getElementById('edit-dialog').close()">キャンセル</button>
+  </dialog>
 
   <dialog id="delete-all-dialog" aria-labelledby="delete-all-title" aria-describedby="delete-all-message">
     <h2 id="delete-all-title"></h2>
@@ -407,6 +430,78 @@
     resetDateTime();
   }
 
+  let editingExpense = null;
+  let editOriginalDate = "";
+  let editOriginalTime = "";
+
+  function fillEditOptions(id, values, selected) {
+    const select = document.getElementById(id);
+    select.innerHTML = "";
+    [...new Set([...values, selected])].forEach(value => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value || "選択しない";
+      select.appendChild(option);
+    });
+    select.value = selected;
+  }
+
+  function updateEditSubcategories(selected = "") {
+    const category = document.getElementById("edit-category").value;
+    fillEditOptions("edit-subcategory", ["", ...(subcategories[category] || [])], selected);
+  }
+
+  function startEditExpense(expense) {
+    editingExpense = expense;
+    fillEditOptions("edit-category", ["食事", "交通", "宿泊", "お土産", "登山", "観光・参拝", "その他"], expense.category);
+    updateEditSubcategories(expense.subcategory || "");
+    document.getElementById("edit-amount").value = expense.amount;
+    document.getElementById("edit-memo").value = expense.memo || "";
+    editOriginalDate = expense.date || "";
+    editOriginalTime = (/(\d{2}:\d{2})$/.exec(expense.dateTime || "") || [,""])[1];
+    document.getElementById("edit-date").value = editOriginalDate;
+    document.getElementById("edit-time").value = editOriginalTime;
+    document.getElementById("edit-date-note").textContent =
+      !editOriginalDate || !editOriginalTime ? "日時が不明な旧記録です。日時欄を変更しなければ元の情報を保持します。変更する場合は日付と時刻の両方を入力してください。" : "";
+    document.getElementById("edit-dialog").showModal();
+  }
+
+  function updateExpense() {
+    const index = expenses.indexOf(editingExpense);
+    if (index < 0) {
+      alert("この記録は削除または置き換えられました。記録一覧から開き直してください。");
+      return;
+    }
+    const amount = Number(document.getElementById("edit-amount").value);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("金額を入力してください");
+      return;
+    }
+    const updated = {...editingExpense,
+      category: document.getElementById("edit-category").value,
+      amount, memo: document.getElementById("edit-memo").value};
+    const subcategory = document.getElementById("edit-subcategory").value;
+    if (subcategory) updated.subcategory = subcategory;
+    else delete updated.subcategory;
+    const date = document.getElementById("edit-date").value;
+    const time = document.getElementById("edit-time").value;
+    if (date !== editOriginalDate || time !== editOriginalTime) {
+      const parsed = new Date(date + "T" + time);
+      if (!date || !time || !Number.isFinite(parsed.getTime()) || localDate(parsed) !== date) {
+        alert("日付と時刻を入力してください");
+        return;
+      }
+      updated.date = date;
+      updated.dateTime = parsed.toLocaleString("ja-JP", {
+        month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit"
+      });
+    }
+    const next = expenses.map((expense, i) => i === index ? updated : expense);
+    if (!saveExpenses(next)) return;
+    document.getElementById("edit-dialog").close();
+    editingExpense = null;
+  }
+
   // 旧データには年がないため、今年の記録と推測して混ぜない
   function getExpenseDay(expense) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(expense.date || "")) {
@@ -466,6 +561,12 @@ deleteButton.onclick = function() {
 };
 
 item.appendChild(deleteButton);
+const editButton = document.createElement("button");
+editButton.textContent = "修正";
+editButton.className = "edit-button";
+editButton.type = "button";
+editButton.onclick = () => startEditExpense(expense);
+item.appendChild(editButton);
 
       if (!dayRecords.has(day)) dayRecords.set(day, []);
       dayRecords.get(day).push(item);
