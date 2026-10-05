@@ -182,7 +182,9 @@
       border-color: #f5dce0;
     }
 
-    .day-records .delete-button, .edit-button { display: inline-block; width: auto; margin: 10px 8px 0 0; min-height: 44px; padding: 9px 16px; font-size: 14px; }
+    .record-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+    .record-actions .delete-button, .record-actions .edit-button { display: block; flex: 0 0 auto; width: auto; margin: 0; min-height: 44px; padding: 9px 16px; font-size: 14px; }
+    .day-records > li { overflow-wrap: anywhere; }
     #edit-dialog { width: min(440px, calc(100% - 48px)); max-height: 85vh; overflow: auto; border: 0; border-radius: 16px; padding: 20px; }
     #edit-dialog::backdrop { background: rgb(0 0 0 / 35%); }
 
@@ -560,13 +562,16 @@ deleteButton.onclick = function() {
   saveExpenses(expenses.filter((_, itemIndex) => itemIndex !== index));
 };
 
-item.appendChild(deleteButton);
+const actions = document.createElement("div");
+actions.className = "record-actions";
+actions.appendChild(deleteButton);
 const editButton = document.createElement("button");
 editButton.textContent = "修正";
 editButton.className = "edit-button";
 editButton.type = "button";
 editButton.onclick = () => startEditExpense(expense);
-item.appendChild(editButton);
+actions.appendChild(editButton);
+item.appendChild(actions);
 
       if (!dayRecords.has(day)) dayRecords.set(day, []);
       dayRecords.get(day).push(item);

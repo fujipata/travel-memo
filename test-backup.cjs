@@ -78,7 +78,7 @@ function cards(h) {
  h.env.navigator.share=async()=>{const e=Error();e.name='AbortError';throw e};await c.exportRecords('csv');assert(h.els['data-status'].textContent.includes('キャンセル'));
  h.env.navigator.canShare=()=>false;await c.exportRecords('csv');assert(h.downloads[0].endsWith('.csv'));
  h.env.failKey='expenses';h.env.document.getElementById('amount').value='250';h.env.document.getElementById('category').value='食事';c.addExpense();assert.equal(h.els.total.textContent,'合計：2,150円');
- h.env.failKey=null;c.addExpense();assert.equal(h.els.total.textContent,'合計：2,400円');cards(h).find(item => item.textContent.includes('250円')).children[0].onclick();assert.equal(h.els.total.textContent,'合計：2,150円');
+ h.env.failKey=null;c.addExpense();assert.equal(h.els.total.textContent,'合計：2,400円');cards(h).find(item => item.textContent.includes('250円')).children[0].children[0].onclick();assert.equal(h.els.total.textContent,'合計：2,150円');
  console.log('PASS: CSV quoting/BOM/formula protection; backup round-trip; invalid/oversized input; restore preview/cancel; storage failure; restore/undo across reload; empty restore; stale reads; sharing/cancellation/download; add/delete regression.');
 
  // Mac backup routing must not change mobile sharing, CSV, or stored records.

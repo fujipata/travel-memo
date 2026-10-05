@@ -23,13 +23,13 @@ assert.equal(h.read()[1].date,'2025-09-29');assert.equal(h.read()[1].dateTime,'9
 assert.equal(h.els['expense-date'].value,'2026-10-01');assert.equal(h.groups().length,2);
 let past=h.groups()[1];assert.equal(past.open,false);assert.equal(past.children[0].children[1].textContent,'合計 1,200円');
 assert.match(past.children[0].children[0].textContent,/月/);
-past.open=true;past.listeners.toggle();past.children[1].children[0].children[0].onclick();
+past.open=true;past.listeners.toggle();past.children[1].children[0].children[0].children[0].onclick();
 past=h.groups()[1];assert.equal(past.open,true);assert.equal(past.children[0].children[1].textContent,'合計 700円');assert.equal(h.els.total.textContent,'合計：1,900円');
 assert.match(past.children[1].children[0].textContent,/9\/29 09:40.*交通 \/ 駐車場.*700円.*追加/);
 const reloaded=harness(h.read());assert.equal(reloaded.groups()[0].open,true);assert.equal(reloaded.groups()[1].open,false);
 const before=JSON.stringify(h.read());choose('','09:00');add(100,'invalid');assert.equal(JSON.stringify(h.read()),before);assert.equal(h.alerts.length,1);
 choose('2025-02-30','09:00');add(100,'invalid');assert.equal(JSON.stringify(h.read()),before);
-past.children[1].children[0].children[0].onclick();assert.equal(h.groups().length,1);
+past.children[1].children[0].children[0].children[0].onclick();assert.equal(h.groups().length,1);
 const old=[{category:'その他',amount:50,memo:'legacy',dateTime:'9/29 10:00'},{category:'その他',amount:20,memo:'unknown'}];
 const legacy=harness(old);assert.deepEqual(legacy.read(),old);assert(legacy.groups().every(g=>!g.open));
 console.log('PASS: fresh current time; backdated date/time and grouping; weekday/totals; full cards; open-state retention; deletion; reload defaults; invalid dates; last-item deletion; legacy records unchanged.');
