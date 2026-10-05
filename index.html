@@ -185,7 +185,40 @@
     .record-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
     .record-actions .delete-button, .record-actions .edit-button { display: block; flex: 0 0 auto; width: auto; margin: 0; min-height: 44px; padding: 9px 16px; font-size: 14px; }
     .day-records > li { overflow-wrap: anywhere; }
-    #edit-dialog { width: min(440px, calc(100% - 48px)); max-height: 85vh; overflow: auto; border: 0; border-radius: 16px; padding: 20px; }
+    #edit-dialog {
+      width: calc(100% - 32px);
+      max-width: 440px;
+      max-height: 85vh;
+      max-height: 85dvh;
+      overflow: auto;
+      padding: 20px;
+      border: 1px solid #e3ebf2;
+      border-radius: 16px;
+      color: #252f3d;
+      background: #fff;
+    }
+    #edit-dialog h2 { margin: 0 0 20px; }
+    #edit-dialog label { margin: 16px 0 6px; }
+    #edit-dialog input, #edit-dialog select, #edit-dialog button {
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      height: 48px;
+      min-height: 48px;
+      margin: 0;
+      padding: 10px 12px;
+    }
+    #edit-dialog input[type="date"], #edit-dialog input[type="time"] {
+      -webkit-appearance: none;
+      appearance: none;
+      text-align: left;
+    }
+    #edit-dialog input::-webkit-date-and-time-value { text-align: left; }
+    #edit-date-note:not(:empty) { margin: 12px 0 0; }
+    .edit-dialog-actions { display: grid; gap: 10px; margin-top: 24px; }
+    #edit-dialog .cancel-button { background: #f8fafc; color: #354b60; border-color: #d5e0eb; }
     #edit-dialog::backdrop { background: rgb(0 0 0 / 35%); }
 
     #delete-all-button { margin: 0 0 24px auto; }
@@ -303,8 +336,10 @@
     <label for="edit-time">時刻</label>
     <input type="time" id="edit-time">
     <p id="edit-date-note"></p>
-    <button type="button" onclick="updateExpense()">更新</button>
-    <button type="button" onclick="document.getElementById('edit-dialog').close()">キャンセル</button>
+    <div class="edit-dialog-actions">
+      <button type="button" onclick="updateExpense()">更新</button>
+      <button class="cancel-button" type="button" onclick="document.getElementById('edit-dialog').close()">キャンセル</button>
+    </div>
   </dialog>
 
   <dialog id="delete-all-dialog" aria-labelledby="delete-all-title" aria-describedby="delete-all-message">
