@@ -611,7 +611,7 @@
     const list = document.getElementById("category-totals");
     list.innerHTML = "";
     if (!categoryTotals.size) {
-      displayCategoryDetails(categoryTotals, categoryRecords);
+      displaySummary("category-totals", categoryTotals);
       return;
     }
     categoryTotals.forEach((total, category) => {
@@ -732,7 +732,7 @@ item.appendChild(actions);
     displaySummary("daily-totals", new Map(
       [...dailyTotals].sort(([a], [b]) => compareExpenseDays(a, b))
     ));
-    displaySummary("category-totals", categoryTotals);
+    displayCategoryDetails(categoryTotals, categoryRecords);
   }
 
   const BACKUP_APP = "travel-memo";
