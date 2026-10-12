@@ -671,7 +671,8 @@ item.appendChild(actions);
       details.appendChild(summary);
       const records = document.createElement("ul");
       records.className = "day-records";
-      items.forEach(item => records.appendChild(item));
+      // 日付内は最後に入力した記録から表示する。
+      [...items].reverse().forEach(item => records.appendChild(item));
       details.appendChild(records);
       group.appendChild(details);
       list.appendChild(group);
