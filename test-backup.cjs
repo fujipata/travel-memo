@@ -16,7 +16,7 @@ function harness(records=fixtures, storage=new Map()) {
   function el(){return {value:'',hidden:false,children:[],appendChild(x){this.children.push(x)},addEventListener(){},set innerHTML(v){this.children=[]},click(){downloads.push(this.download)},remove(){}}}
   const document={getElementById(id){return els[id]??=el()},createElement:el,body:el()};
   const env={document,File:globalThis.File,Date,console,confirm:()=>true,alert:m=>alerts.push(m),
-    navigator:{canShare:()=>true,share:async x=>shared.push(x)},URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},setTimeout:f=>f(),
+    navigator:{canShare:()=>true,share:async x=>shared.push(x)},URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},setTimeout:f=>f(),clearTimeout(){},
     localStorage:{getItem:k=>storage.get(k)??null,setItem(k,v){if(env.failKey===k)throw Error('quota');storage.set(k,v)}}};
   const ctx=vm.createContext(env); vm.runInContext(source,ctx);
   return {ctx,els,storage,env,downloads,shared,alerts};

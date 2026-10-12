@@ -260,11 +260,28 @@
       .input-card, section[aria-label="オフライン利用"],
       section[aria-labelledby="data-heading"] { padding: 16px; }
     }
+    #record-notice {
+      position: fixed;
+      top: calc(env(safe-area-inset-top, 0px) + 24px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      max-width: calc(100vw - 32px);
+      padding: 14px 24px;
+      border-radius: 14px;
+      background: #24547e;
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 6px 24px rgba(36, 84, 126, 0.25);
+      pointer-events: none;
+    }
   </style>
   <script src="./offline.js" defer></script>
 </head>
 
 <body>
+
+  <div id="record-notice" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
   <h1>旅行　支出メモ</h1>
   <section aria-label="オフライン利用">
@@ -420,6 +437,26 @@
   resetDateTime();
 
   const dayOpenStates = new Map();
+  let recordNoticeTimer;
+
+  function showRecordNotice() {
+    const notice = document.getElementById("record-notice");
+    clearTimeout(recordNoticeTimer);
+    notice.textContent = "記録しました";
+    notice.hidden = false;
+    recordNoticeTimer = setTimeout(() => {
+      notice.hidden = true;
+      notice.textContent = "";
+    }, 2000);
+  }
+
+  // 年の分かる日付を新しい順に表示し、年不明・日付不明は末尾に置く。
+  function compareExpenseDays(a, b) {
+    const datedA = /^\d{4}-\d{2}-\d{2}$/.test(a);
+    const datedB = /^\d{4}-\d{2}-\d{2}$/.test(b);
+    if (datedA !== datedB) return datedA ? -1 : 1;
+    return b.localeCompare(a, "ja");
+  }
 
   function addExpense() {
     const category = document.getElementById("category").value;
@@ -465,6 +502,7 @@
     document.getElementById("amount").value = "";
     document.getElementById("memo").value = "";
     resetDateTime();
+    showRecordNotice();
   }
 
   let editingExpense = null;
@@ -612,7 +650,7 @@ item.appendChild(actions);
       dayRecords.get(day).push(item);
     });
 
-    [...dayRecords].sort(([a], [b]) => b.localeCompare(a, "ja")).forEach(([day, items]) => {
+    [...dayRecords].sort(([a], [b]) => compareExpenseDays(a, b)).forEach(([day, items]) => {
       const group = document.createElement("li");
       group.className = "day-group";
       const details = document.createElement("details");
@@ -641,7 +679,7 @@ item.appendChild(actions);
     document.getElementById("total").textContent =
       "合計：" + total.toLocaleString() + "円";
     displaySummary("daily-totals", new Map(
-      [...dailyTotals].sort(([a], [b]) => a.localeCompare(b, "ja"))
+      [...dailyTotals].sort(([a], [b]) => compareExpenseDays(a, b))
     ));
     displaySummary("category-totals", categoryTotals);
   }
