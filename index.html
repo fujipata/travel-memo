@@ -262,9 +262,9 @@
     }
     #record-notice {
       position: fixed;
-      top: calc(env(safe-area-inset-top, 0px) + 24px);
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
+      transform: translate(-50%, -50%);
       z-index: 1000;
       max-width: calc(100vw - 32px);
       padding: 14px 24px;
@@ -632,6 +632,7 @@ deleteButton.textContent = "削除";
 deleteButton.className = "delete-button";
 
 deleteButton.onclick = function() {
+  if (!confirm("削除しますか？")) return;
   saveExpenses(expenses.filter((_, itemIndex) => itemIndex !== index));
 };
 
