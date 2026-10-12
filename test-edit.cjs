@@ -11,7 +11,8 @@ let fail = false;
 function el() { return {value:'',children:[],appendChild(x){this.children.push(x)},addEventListener(){},
   set innerHTML(v){this.children=[]},showModal(){this.open=true},close(){this.open=false}}; }
 const document = {getElementById:id=>els[id]??=el(),createElement:el};
-const ctx = vm.createContext({document,Date,alert:x=>alerts.push(x),localStorage:{
+const confirmations=[];
+const ctx = vm.createContext({document,Date,confirm:m=>{confirmations.push(m);return true},alert:x=>alerts.push(x),localStorage:{
   getItem:k=>storage.get(k)||null,setItem(k,v){if(fail)throw Error('quota');storage.set(k,v)}
 }});
 vm.runInContext(source,ctx);
@@ -20,6 +21,13 @@ const cards = ()=>els.list.children.flatMap(g=>g.children[0].children[1].childre
 const card = index => cards().find(c => c.textContent.startsWith(read()[index].dateTime + "　"));
 const open = index => card(index).children[0].children[1].onclick();
 const set = (field,value)=>els['edit-'+field].value=value;
+ctx.confirm=m=>{confirmations.push(m);return false};
+const beforeDelete=storage.get('expenses');
+card(0).children[0].children[0].onclick();
+assert.equal(confirmations.at(-1),'削除しますか？');
+assert.equal(storage.get('expenses'),beforeDelete);
+assert.equal(els.total.textContent,'合計：1,250円');
+ctx.confirm=m=>{confirmations.push(m);return true};
 open(0);
 assert.equal(els['edit-amount'].value,1200);
 assert.equal(els['edit-subcategory'].value,'外食');

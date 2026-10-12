@@ -9,7 +9,7 @@ function harness(records=[]) {
  const storage=new Map([['expenses',JSON.stringify(records)]]), els={}, alerts=[], timers=new Map();
  let timerId=0, failSave=false;
  function el(){return {value:'',children:[],listeners:{},appendChild(x){this.children.push(x)},addEventListener(n,f){this.listeners[n]=f},set innerHTML(v){this.children=[]}};}
- const ctx=vm.createContext({Date:Clock,document:{getElementById:id=>els[id]??=el(),createElement:el},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>{if(failSave)throw Error('quota');storage.set(k,v)}},alert:m=>alerts.push(m),setTimeout:(fn,delay)=>{timers.set(++timerId,{fn,delay});return timerId},clearTimeout:id=>timers.delete(id)});
+ const ctx=vm.createContext({Date:Clock,document:{getElementById:id=>els[id]??=el(),createElement:el},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>{if(failSave)throw Error('quota');storage.set(k,v)}},alert:m=>alerts.push(m),confirm:()=>true,setTimeout:(fn,delay)=>{timers.set(++timerId,{fn,delay});return timerId},clearTimeout:id=>timers.delete(id)});
  vm.runInContext(source,ctx);
  return {ctx,els,alerts,timers,failSave:value=>failSave=value,read:()=>JSON.parse(storage.get('expenses')),groups:()=>els.list.children.map(g=>g.children[0])};
 }
