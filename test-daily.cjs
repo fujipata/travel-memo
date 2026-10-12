@@ -34,7 +34,10 @@ assert.deepEqual(h.read(),saved);assert.equal(h.els['record-notice'].hidden,true
 h.alerts.length=0;
 let past=h.groups()[1];assert.equal(past.open,false);assert.equal(past.children[0].children[1].textContent,'合計 1,200円');
 assert.match(past.children[0].children[0].textContent,/月/);
-past.open=true;past.listeners.toggle();past.children[1].children[0].children[0].children[0].onclick();
+assert.match(past.children[1].children[0].textContent,/700円.*追加/);
+assert.match(past.children[1].children[1].textContent,/500円.*過去/);
+assert.deepEqual(h.read(),saved); // Display order must not reorder stored records.
+past.open=true;past.listeners.toggle();past.children[1].children[1].children[0].children[0].onclick();
 past=h.groups()[1];assert.equal(past.open,true);assert.equal(past.children[0].children[1].textContent,'合計 700円');assert.equal(h.els.total.textContent,'合計：1,900円');
 assert.match(past.children[1].children[0].textContent,/9\/29 09:40.*交通 \/ 駐車場.*700円.*追加/);
 const reloaded=harness(h.read());assert.equal(reloaded.groups()[0].open,true);assert.equal(reloaded.groups()[1].open,false);
