@@ -152,7 +152,8 @@
     li + li { border-top: 1px solid #e8eef4; }
     #list:empty { border: 0; box-shadow: none; }
 
-    #list > .day-group { padding: 0; }
+    #list > .day-group, #category-totals > .day-group { padding: 0; }
+    .category-date { background: #f2f7fb; font-size: 14px; font-weight: 600; }
     .day-group summary {
       display: flex;
       align-items: center;
@@ -331,6 +332,7 @@
 
   <section aria-labelledby="category-heading">
     <h2 id="category-heading">分類別合計</h2>
+    <p>分類名をタップすると、日付順の内訳を表示します。</p>
     <ul id="category-totals"></ul>
   </section>
 
@@ -436,6 +438,7 @@
   });
   resetDateTime();
 
+  const categoryOpenStates = new Map();
   const dayOpenStates = new Map();
   let recordNoticeTimer;
 
@@ -604,6 +607,47 @@
     });
   }
 
+  function displayCategoryDetails(categoryTotals, categoryRecords) {
+    const list = document.getElementById("category-totals");
+    list.innerHTML = "";
+    if (!categoryTotals.size) {
+      displayCategoryDetails(categoryTotals, categoryRecords);
+      return;
+    }
+    categoryTotals.forEach((total, category) => {
+      const group = document.createElement("li");
+      group.className = "day-group";
+      const details = document.createElement("details");
+      details.open = categoryOpenStates.get(category) || false;
+      details.addEventListener("toggle", () => categoryOpenStates.set(category, details.open));
+      const summary = document.createElement("summary");
+      const label = document.createElement("span");
+      label.textContent = category;
+      const amount = document.createElement("span");
+      amount.className = "day-total";
+      amount.textContent = total.toLocaleString("ja-JP") + "円";
+      summary.append(label, amount);
+      const records = document.createElement("ul");
+      records.className = "day-records";
+      const days = categoryRecords.get(category);
+      [...days].sort(([a], [b]) => compareExpenseDays(a, b)).forEach(([day, items]) => {
+        const heading = document.createElement("li");
+        heading.className = "category-date";
+        heading.textContent = day + "　合計 " +
+          items.reduce((sum, entry) => sum + entry.expense.amount, 0).toLocaleString("ja-JP") + "円";
+        records.appendChild(heading);
+        [...items].reverse().forEach(({item}) => {
+          const copy = item.cloneNode(true);
+          copy.querySelector(".record-actions").remove();
+          records.appendChild(copy);
+        });
+      });
+      details.append(summary, records);
+      group.appendChild(details);
+      list.appendChild(group);
+    });
+  }
+
   function displayExpenses() {
     const list = document.getElementById("list");
     list.innerHTML = "";
@@ -611,6 +655,7 @@
     let total = 0;
     const dailyTotals = new Map();
     const categoryTotals = new Map();
+    const categoryRecords = new Map();
     const dayRecords = new Map();
 
     expenses.forEach(function(expense, index) {
@@ -649,6 +694,10 @@ item.appendChild(actions);
 
       if (!dayRecords.has(day)) dayRecords.set(day, []);
       dayRecords.get(day).push(item);
+      if (!categoryRecords.has(expense.category)) categoryRecords.set(expense.category, new Map());
+      const categoryDays = categoryRecords.get(expense.category);
+      if (!categoryDays.has(day)) categoryDays.set(day, []);
+      categoryDays.get(day).push({expense, item});
     });
 
     [...dayRecords].sort(([a], [b]) => compareExpenseDays(a, b)).forEach(([day, items]) => {
