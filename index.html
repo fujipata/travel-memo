@@ -175,9 +175,22 @@
       display: block;
       overflow: hidden;
       white-space: nowrap;
-      text-overflow: ellipsis;
+      position: relative;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
+    }
+    #category-totals .category-record-text {
+      display: inline-block;
+      width: max-content;
+      max-width: none;
+      white-space: nowrap;
+      will-change: transform;
+    }
+    #category-totals .category-record-line:not(.is-scrolling) .category-record-text {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
     }
     #category-totals .category-record-line:focus-visible {
       outline: 2px solid #0873d1;
@@ -680,35 +693,35 @@
           copy.querySelector(".record-actions").remove();
           const line = document.createElement("span");
           line.className = "category-record-line";
-          line.textContent = copy.firstChild.textContent;
+          const text = document.createElement("span");
+          text.className = "category-record-text";
+          text.textContent = copy.firstChild.textContent;
+          line.appendChild(text);
           copy.replaceChildren(line);
           line.tabIndex = 0;
           line.setAttribute("role", "button");
-          line.setAttribute("aria-label", "タップして内容を横スクロール表示：" + line.textContent);
+          line.setAttribute("aria-label", "タップして内容を横スクロール表示：" + text.textContent);
           let animation = null;
           function playOnce() {
             if (animation) animation.cancel();
-            line.scrollLeft = 0;
-            const distance = line.scrollWidth - line.clientWidth;
+            text.style.transform = "";
+            line.classList.remove("is-scrolling");
+            // 全文の幅を測定し、見えていない文字まで移動させる。
+            const distance = Math.max(0, text.scrollWidth - line.clientWidth);
             if (distance <= 0) return;
-            const duration = Math.max(1600, Math.min(8000, distance * 14));
-            const start = performance.now();
-            function frame(now) {
-              const elapsed = now - start;
-              const travelTime = duration * 0.8;
-              const holdTime = 700;
-              if (elapsed < travelTime) {
-                line.scrollLeft = distance * (elapsed / travelTime);
-              } else if (elapsed < travelTime + holdTime) {
-                line.scrollLeft = distance;
-              } else {
-                line.scrollLeft = 0;
-                animation = null;
-                return;
-              }
-              animation = requestAnimationFrame(frame);
-            }
-            animation = requestAnimationFrame(frame);
+            line.classList.add("is-scrolling");
+            const duration = Math.max(1800, Math.min(10000, distance * 16));
+            animation = text.animate([
+              {transform: "translateX(0)", offset: 0},
+              {transform: "translateX(" + (-distance) + "px)", offset: 0.85},
+              {transform: "translateX(" + (-distance) + "px)", offset: 1}
+            ], {duration, easing: "linear", iterations: 1});
+            const current = animation;
+            current.onfinish = () => {
+              if (animation !== current) return;
+              animation = null;
+              line.classList.remove("is-scrolling");
+            };
           }
           line.addEventListener("click", playOnce);
           line.addEventListener("keydown", event => {
