@@ -88,6 +88,8 @@
       line-height: 1.5;
     }
 
+    .trip-name-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+    #clear-trip-name { width: auto; color: #24547e; background: #edf5ff; border-color: #dceafd; }
     .expense-classification { border: 0; min-width: 0; margin: 0; padding: 0; }
     .expense-classification legend { font-size: 14px; font-weight: 600; padding: 0; }
     .classification-heading { margin: 10px 0 4px; font-size: 13px; color: #586778; }
@@ -329,10 +331,6 @@
   <div id="record-notice" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
   <h1>旅行　支出メモ</h1>
-  <div class="input-card">
-    <label for="trip-name">旅行名（ファイル名）</label>
-    <input id="trip-name" type="text" maxlength="60" placeholder="例：北海道旅行" autocomplete="off">
-  </div>
   <section aria-label="オフライン利用">
     <p id="offline-status" role="status">オフライン利用の準備を確認しています。</p>
     <p id="connection-status"></p>
@@ -342,6 +340,11 @@
   </section>
 
   <div class="input-card">
+  <label for="trip-name">旅行名（ファイル名）</label>
+  <div class="trip-name-row">
+    <input id="trip-name" type="text" maxlength="60" placeholder="例：北海道旅行" autocomplete="off">
+    <button id="clear-trip-name" type="button" aria-label="旅行名をクリア">クリア</button>
+  </div>
   <fieldset class="expense-classification">
     <legend>小分類</legend>
     <div id="expense-classification"></div>
@@ -431,12 +434,17 @@
 
   const tripNameInput = document.getElementById("trip-name");
   tripNameInput.value = localStorage.getItem("travel-memo-trip-name") || "";
-  tripNameInput.addEventListener("input", () => {
+  function saveTripName() {
     try {
       localStorage.setItem("travel-memo-trip-name", tripNameInput.value);
     } catch {
       setDataStatus("旅行名を端末に保存できませんでした。今回の書き出しには使用できます。");
     }
+  }
+  tripNameInput.addEventListener("input", saveTripName);
+  document.getElementById("clear-trip-name").addEventListener("click", () => {
+    tripNameInput.value = "";
+    saveTripName();
   });
 
   const subcategories = {

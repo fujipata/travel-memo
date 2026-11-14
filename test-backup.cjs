@@ -108,6 +108,14 @@ function cards(h) {
  assert.match(reopened.shared[1].files[0].name, /^北海道-旅行-.*\.json$/);
  assert.deepEqual(JSON.parse(await reopened.shared[1].files[0].text()).expenses, fixtures);
 
+ reopened.els['clear-trip-name'].listeners.click();
+ assert.equal(reopened.els['trip-name'].value, '');
+ assert.equal(reopened.storage.get('expenses'), JSON.stringify(fixtures));
+ const cleared = harness(fixtures, reopened.storage);
+ assert.equal(cleared.els['trip-name'].value, '');
+ await cleared.ctx.exportRecords('csv');
+ assert.match(cleared.shared[0].files[0].name, /^travel-memo-.*\.csv$/);
+
  // Mac backup routing must not change mobile sharing, CSV, or stored records.
  for (const [platform,maxTouchPoints] of [['iPhone',5],['iPad',5],['MacIntel',5],['Win32',0],['Linux armv8l',5]]) {
   const mobile=harness();
