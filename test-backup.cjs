@@ -33,7 +33,7 @@ function cards(h) {
 {
  const h=harness(), c=h.ctx;
  h.env.document.getElementById('amount');h.env.document.getElementById('memo');
- const expected={'食事':['外食','コンビニ'],'交通':['ガソリン','高速料金','駐車場','公共交通'],'宿泊':['ホテル','日帰り温泉'],'登山':['登山バッジ','入山料'],'観光・参拝':['拝観料','御朱印','お土産','その他'],'その他':[]};
+ const expected={'食事':['外食','コンビニ'],'交通':['ガソリン','高速料金','駐車場','公共交通'],'宿泊':['ホテル','日帰り温泉'],'登山':['登山バッジ','入山料'],'観光・参拝':['拝観料','御朱印','お土産'],'その他':[]};
  const groups=h.els['expense-classification'].children;
  for(const [category,choices] of Object.entries(expected)) {
   for(const subcategory of choices) {
@@ -51,7 +51,7 @@ function cards(h) {
    assert(c.makeCsv(records).includes('"'+subcategory+'"'));
   }
  }
- assert.equal(h.els.total.textContent,'合計：3,550円');
+ assert.equal(h.els.total.textContent,'合計：3,450円');
  assert(h.els['category-totals'].children.some(x=>x.children[0].children[0].children.map(span=>span.textContent).join('')==='食事1,500円'));
  assert.deepEqual(JSON.parse(h.storage.get('expenses')).slice(0,4),fixtures);
  const before=h.storage.get('expenses');
@@ -67,7 +67,7 @@ function cards(h) {
  for(const subcategory of [null,42,{},'x'.repeat(101)]) assert.throws(()=>c.parseBackup(c.makeBackup([{...fixtures[0],subcategory}])));
  const selected=[{...fixtures[0],subcategory:'外食'}];
  const reloaded=harness(selected);assert(cards(reloaded)[0].textContent.includes('食事 / 外食'));
- console.log('PASS: all 14 subcategories; selection states; storage/reload/backup/CSV; legacy records; unchanged category totals; invalid subcategory handling.');
+ console.log('PASS: all 13 subcategories; selection states; storage/reload/backup/CSV; legacy records; unchanged category totals; invalid subcategory handling.');
 }
 (async()=>{
  let h=harness(),c=h.ctx;
