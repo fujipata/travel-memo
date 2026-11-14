@@ -329,6 +329,10 @@
   <div id="record-notice" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
   <h1>旅行　支出メモ</h1>
+  <div class="input-card">
+    <label for="trip-name">旅行名（ファイル名）</label>
+    <input id="trip-name" type="text" maxlength="60" placeholder="例：北海道旅行" autocomplete="off">
+  </div>
   <section aria-label="オフライン利用">
     <p id="offline-status" role="status">オフライン利用の準備を確認しています。</p>
     <p id="connection-status"></p>
@@ -425,12 +429,22 @@
   // 保存済みの記録を読み込む
   let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
 
+  const tripNameInput = document.getElementById("trip-name");
+  tripNameInput.value = localStorage.getItem("travel-memo-trip-name") || "";
+  tripNameInput.addEventListener("input", () => {
+    try {
+      localStorage.setItem("travel-memo-trip-name", tripNameInput.value);
+    } catch {
+      setDataStatus("旅行名を端末に保存できませんでした。今回の書き出しには使用できます。");
+    }
+  });
+
   const subcategories = {
     "食事": ["外食", "コンビニ"],
     "交通": ["ガソリン", "高速料金", "駐車場", "公共交通"],
     "宿泊": ["ホテル", "日帰り温泉"],
     "登山": ["登山バッジ", "入山料"],
-    "観光・参拝": ["拝観料", "御朱印", "その他"]
+    "観光・参拝": ["拝観料", "御朱印", "お土産", "その他"]
   };
 
   let selectedClassification = null;
@@ -467,7 +481,7 @@
   Object.entries(subcategories).forEach(([category, choices]) => {
     addClassificationGroup(classification, category, choices.map(subcategory => ({category, subcategory})));
   });
-  addClassificationGroup(classification, "その他の支出", [{category: "お土産"}, {category: "その他"}]);
+  addClassificationGroup(classification, "その他の支出", [{category: "その他"}]);
 
   function localDate(date) {
     return date.getFullYear() + "-" +
@@ -583,7 +597,7 @@
 
   function startEditExpense(expense) {
     editingExpense = expense;
-    fillEditOptions("edit-category", ["食事", "交通", "宿泊", "お土産", "登山", "観光・参拝", "その他"], expense.category);
+    fillEditOptions("edit-category", ["食事", "交通", "宿泊", "登山", "観光・参拝", "その他"], expense.category);
     updateEditSubcategories(expense.subcategory || "");
     document.getElementById("edit-amount").value = expense.amount;
     document.getElementById("edit-memo").value = expense.memo || "";
@@ -930,8 +944,12 @@ item.appendChild(actions);
 
   async function exportRecords(kind) {
     const isCsv = kind === "csv";
+    const tripName = tripNameInput.value.trim()
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+      .replace(/^[. ]+|[. ]+$/g, "");
+    const prefix = tripName || "travel-memo";
     const file = new File([isCsv ? makeCsv(expenses) : makeBackup(expenses)],
-      "travel-memo-" + fileStamp() + (isCsv ? ".csv" : ".json"),
+      prefix + "-" + fileStamp() + (isCsv ? ".csv" : ".json"),
       {type: isCsv ? "text/csv;charset=utf-8" : "application/json"});
     try {
       // Only Mac backups change policy; iPadOS can report MacIntel, so exclude it.

@@ -18,7 +18,7 @@ function harness(records=fixtures, storage=new Map()) {
   append(...nodes){this.children.push(...nodes)},
   querySelector(selector){return this.children.find(child=>'.'+child.className===selector)},
   cloneNode(){return {...this, firstChild:this.firstChild, querySelector:()=>({remove(){}})}},
-  replaceChildren(...nodes){this.children=nodes},appendChild(x){this.children.push(x)},addEventListener(){},set innerHTML(v){this.children=[]},click(){downloads.push(this.download)},remove(){}}}
+  replaceChildren(...nodes){this.children=nodes},appendChild(x){this.children.push(x)},listeners:{},addEventListener(name,listener){this.listeners[name]=listener},set innerHTML(v){this.children=[]},click(){downloads.push(this.download)},remove(){}}}
   const document={getElementById(id){return els[id]??=el()},createElement:el,body:el()};
   const env={document,File:globalThis.File,Date,console,confirm:()=>true,alert:m=>alerts.push(m),
     navigator:{canShare:()=>true,share:async x=>shared.push(x)},URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},setTimeout:f=>f(),clearTimeout(){},
@@ -33,7 +33,7 @@ function cards(h) {
 {
  const h=harness(), c=h.ctx;
  h.env.document.getElementById('amount');h.env.document.getElementById('memo');
- const expected={'食事':['外食','コンビニ'],'交通':['ガソリン','高速料金','駐車場','公共交通'],'宿泊':['ホテル','日帰り温泉'],'登山':['登山バッジ','入山料'],'観光・参拝':['拝観料','御朱印','その他'],'お土産':[],'その他':[]};
+ const expected={'食事':['外食','コンビニ'],'交通':['ガソリン','高速料金','駐車場','公共交通'],'宿泊':['ホテル','日帰り温泉'],'登山':['登山バッジ','入山料'],'観光・参拝':['拝観料','御朱印','お土産','その他'],'その他':[]};
  const groups=h.els['expense-classification'].children;
  for(const [category,choices] of Object.entries(expected)) {
   for(const subcategory of choices) {
@@ -51,13 +51,13 @@ function cards(h) {
    assert(c.makeCsv(records).includes('"'+subcategory+'"'));
   }
  }
- assert.equal(h.els.total.textContent,'合計：3,450円');
+ assert.equal(h.els.total.textContent,'合計：3,550円');
  assert(h.els['category-totals'].children.some(x=>x.children[0].children[0].children.map(span=>span.textContent).join('')==='食事1,500円'));
  assert.deepEqual(JSON.parse(h.storage.get('expenses')).slice(0,4),fixtures);
  const before=h.storage.get('expenses');
  h.els.amount.value='100';c.addExpense();
  assert.equal(h.storage.get('expenses'),before);
- for(const category of ['お土産','その他']) {
+ for(const category of ['その他']) {
   groups.at(-1).children.find(button=>button.textContent===category).onclick();
   h.els.amount.value='100';c.addExpense();
   const record=JSON.parse(h.storage.get('expenses')).at(-1);
@@ -67,7 +67,7 @@ function cards(h) {
  for(const subcategory of [null,42,{},'x'.repeat(101)]) assert.throws(()=>c.parseBackup(c.makeBackup([{...fixtures[0],subcategory}])));
  const selected=[{...fixtures[0],subcategory:'外食'}];
  const reloaded=harness(selected);assert(cards(reloaded)[0].textContent.includes('食事 / 外食'));
- console.log('PASS: all 13 subcategories; selection states; storage/reload/backup/CSV; legacy records; unchanged category totals; invalid subcategory handling.');
+ console.log('PASS: all 14 subcategories; selection states; storage/reload/backup/CSV; legacy records; unchanged category totals; invalid subcategory handling.');
 }
 (async()=>{
  let h=harness(),c=h.ctx;
@@ -95,6 +95,18 @@ function cards(h) {
  h.env.failKey='expenses';h.env.document.getElementById('amount').value='250';h.els['expense-classification'].children[1].children[0].onclick();c.addExpense();assert.equal(h.els.total.textContent,'合計：2,150円');
  h.env.failKey=null;c.addExpense();assert.equal(h.els.total.textContent,'合計：2,400円');cards(h).find(item => item.textContent.includes('250円')).children[0].children[0].onclick();assert.equal(h.els.total.textContent,'合計：2,150円');
  console.log('PASS: CSV quoting/BOM/formula protection; backup round-trip; invalid/oversized input; restore preview/cancel; storage failure; restore/undo across reload; empty restore; stale reads; sharing/cancellation/download; add/delete regression.');
+
+ const named = harness();
+ const tripName = named.els['trip-name'];
+ tripName.value = '北海道/旅行';
+ tripName.listeners.input();
+ const reopened = harness(fixtures, named.storage);
+ assert.equal(reopened.els['trip-name'].value, '北海道/旅行');
+ await reopened.ctx.exportRecords('csv');
+ await reopened.ctx.exportRecords('backup');
+ assert.match(reopened.shared[0].files[0].name, /^北海道-旅行-.*\.csv$/);
+ assert.match(reopened.shared[1].files[0].name, /^北海道-旅行-.*\.json$/);
+ assert.deepEqual(JSON.parse(await reopened.shared[1].files[0].text()).expenses, fixtures);
 
  // Mac backup routing must not change mobile sharing, CSV, or stored records.
  for (const [platform,maxTouchPoints] of [['iPhone',5],['iPad',5],['MacIntel',5],['Win32',0],['Linux armv8l',5]]) {
