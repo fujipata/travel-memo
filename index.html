@@ -88,6 +88,25 @@
       line-height: 1.5;
     }
 
+    .expense-classification { border: 0; min-width: 0; margin: 0; padding: 0; }
+    .expense-classification legend { font-size: 14px; font-weight: 600; padding: 0; }
+    .classification-heading { margin: 10px 0 4px; font-size: 13px; color: #586778; }
+    .classification-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    .classification-buttons button {
+      min-height: 44px;
+      margin: 0;
+      padding: 6px;
+      font-size: 14px;
+      color: #24547e;
+      background: #edf5ff;
+      border-color: #dceafd;
+    }
+    .classification-buttons button[aria-pressed="true"] {
+      color: #fff;
+      background: #0873d1;
+      border-color: #0873d1;
+    }
+
     .input-card input,
     .input-card select {
       display: block;
@@ -319,19 +338,10 @@
   </section>
 
   <div class="input-card">
-  <label>大分類</label>
-  <select id="category">
-    <option>食事</option>
-    <option>交通</option>
-    <option>宿泊</option>
-    <option>お土産</option>
-    <option>登山</option>
-    <option>観光・参拝</option>
-    <option>その他</option>
-  </select>
-
-  <label for="subcategory">小分類</label>
-  <select id="subcategory"></select>
+  <fieldset class="expense-classification">
+    <legend>小分類</legend>
+    <div id="expense-classification"></div>
+  </fieldset>
 
   <label>金額</label>
   <input type="number" id="amount" placeholder="例：1200">
@@ -423,26 +433,41 @@
     "観光・参拝": ["拝観料", "御朱印", "その他"]
   };
 
-  function updateSubcategories() {
-    const choices = subcategories[document.getElementById("category").value] || [];
-    const select = document.getElementById("subcategory");
-    select.innerHTML = "";
-    const empty = document.createElement("option");
-    empty.value = "";
-    empty.textContent = choices.length ? "選択しない" : "小分類なし";
-    select.appendChild(empty);
-    choices.forEach(label => {
-      const option = document.createElement("option");
-      option.value = label;
-      option.textContent = label;
-      select.appendChild(option);
-    });
-    select.value = "";
-    select.disabled = choices.length === 0;
+  let selectedClassification = null;
+  let selectedClassificationButton = null;
+
+  function selectClassification(classification, button) {
+    selectedClassificationButton?.setAttribute("aria-pressed", "false");
+    selectedClassification = classification;
+    selectedClassificationButton = button;
+    button?.setAttribute("aria-pressed", "true");
   }
 
-  document.getElementById("category").addEventListener("change", updateSubcategories);
-  updateSubcategories();
+  function addClassificationGroup(container, heading, choices) {
+    const label = document.createElement("h3");
+    label.className = "classification-heading";
+    label.textContent = heading;
+    container.appendChild(label);
+
+    const buttons = document.createElement("div");
+    buttons.className = "classification-buttons";
+    choices.forEach(({category, subcategory}) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = subcategory || category;
+      button.setAttribute("aria-label", subcategory ? category + " / " + subcategory : category);
+      button.setAttribute("aria-pressed", "false");
+      button.onclick = () => selectClassification(subcategory ? {category, subcategory} : {category}, button);
+      buttons.appendChild(button);
+    });
+    container.appendChild(buttons);
+  }
+
+  const classification = document.getElementById("expense-classification");
+  Object.entries(subcategories).forEach(([category, choices]) => {
+    addClassificationGroup(classification, category, choices.map(subcategory => ({category, subcategory})));
+  });
+  addClassificationGroup(classification, "その他の支出", [{category: "お土産"}, {category: "その他"}]);
 
   function localDate(date) {
     return date.getFullYear() + "-" +
@@ -487,8 +512,10 @@
   }
 
   function addExpense() {
-    const category = document.getElementById("category").value;
-    const subcategory = document.getElementById("subcategory").value;
+    if (!selectedClassification) {
+      alert("支出の分類を選んでください");
+      return;
+    }
     const amount = Number(document.getElementById("amount").value);
     const memo = document.getElementById("memo").value;
 
@@ -511,8 +538,7 @@
 
     // 新しい支出を記録に追加
     const next = [...expenses, {
-      category: category,
-      ...((subcategories[category] || []).includes(subcategory) ? {subcategory} : {}),
+      ...selectedClassification,
       amount: amount,
       memo: memo,
       date: date,
@@ -527,6 +553,7 @@
     if (!saveExpenses(next)) return;
 
     // 入力欄を空にする
+    selectClassification(null, null);
     document.getElementById("amount").value = "";
     document.getElementById("memo").value = "";
     resetDateTime();

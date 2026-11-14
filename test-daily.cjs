@@ -8,13 +8,18 @@ class Clock extends Date { constructor(...args) {super(...(args.length?args:[clo
 function harness(records=[]) {
  const storage=new Map([['expenses',JSON.stringify(records)]]), els={}, alerts=[], timers=new Map();
  let timerId=0, failSave=false;
- function el(){return {value:'',children:[],listeners:{},appendChild(x){this.children.push(x)},addEventListener(n,f){this.listeners[n]=f},set innerHTML(v){this.children=[]}};}
+ function el(){return {value:'',children:[],listeners:{},setAttribute(k,v){this[k]=v},
+  get firstChild(){return {textContent:this.textContent}},
+  append(...nodes){this.children.push(...nodes)},
+  querySelector(selector){return this.children.find(child=>'.'+child.className===selector)},
+  cloneNode(){return {...this, firstChild:this.firstChild, querySelector:()=>({remove(){}})}},
+  replaceChildren(...nodes){this.children=nodes},appendChild(x){this.children.push(x)},addEventListener(n,f){this.listeners[n]=f},set innerHTML(v){this.children=[]}};}
  const ctx=vm.createContext({Date:Clock,document:{getElementById:id=>els[id]??=el(),createElement:el},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>{if(failSave)throw Error('quota');storage.set(k,v)}},alert:m=>alerts.push(m),confirm:()=>true,setTimeout:(fn,delay)=>{timers.set(++timerId,{fn,delay});return timerId},clearTimeout:id=>timers.delete(id)});
  vm.runInContext(source,ctx);
  return {ctx,els,alerts,timers,failSave:value=>failSave=value,read:()=>JSON.parse(storage.get('expenses')),groups:()=>els.list.children.map(g=>g.children[0])};
 }
 const h=harness();
-const add=(amount,memo)=>{h.els.amount??=h.ctx.document.getElementById('amount');h.els.memo??=h.ctx.document.getElementById('memo');h.els.amount.value=amount;h.els.memo.value=memo;h.els.category.value='交通';h.els.subcategory.value='駐車場';h.ctx.addExpense();};
+const add=(amount,memo)=>{h.els.amount??=h.ctx.document.getElementById('amount');h.els.memo??=h.ctx.document.getElementById('memo');h.els.amount.value=amount;h.els.memo.value=memo;h.els['expense-classification'].children[3].children[2].onclick();h.ctx.addExpense();};
 const choose=(date,time)=>{h.els['expense-date'].value=date;h.els['expense-time'].value=time;h.els['expense-date'].listeners.input();};
 assert.equal(h.els['expense-date'].value,'2026-10-01');assert.equal(h.els['expense-time'].value,'12:34');
 clock=new Date(2026,9,1,13,15);add(1200,'当日');
@@ -28,7 +33,7 @@ assert.equal(h.timers.size,1); // Repeated saves restart the two-second notice.
 const noticeTimer=[...h.timers.values()][0];h.timers.clear();noticeTimer.fn();
 assert.equal(h.els['record-notice'].hidden,true);assert.equal(h.els['record-notice'].textContent,'');
 assert.match(h.els['daily-totals'].children[0].textContent,/2026-10-01/);
-assert.match(h.els['daily-totals'].children[1].textContent,/2025-09-29/);
+assert.match(h.els['daily-totals'].children[1].children[0].children[1].children[0].textContent,/2025-09-29/);
 const saved=h.read();h.failSave(true);add(100,'保存失敗');h.failSave(false);
 assert.deepEqual(h.read(),saved);assert.equal(h.els['record-notice'].hidden,true);assert.equal(h.timers.size,0);
 h.alerts.length=0;

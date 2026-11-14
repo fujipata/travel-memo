@@ -8,7 +8,12 @@ const records = [
 ];
 const els = {}, storage = new Map([['expenses', JSON.stringify(records)]]), alerts = [];
 let fail = false;
-function el() { return {value:'',children:[],appendChild(x){this.children.push(x)},addEventListener(){},
+function el() { return {value:'',children:[],setAttribute(k,v){this[k]=v},
+  get firstChild(){return {textContent:this.textContent}},
+  append(...nodes){this.children.push(...nodes)},
+  querySelector(selector){return this.children.find(child=>'.'+child.className===selector)},
+  cloneNode(){return {...this, firstChild:this.firstChild, querySelector:()=>({remove(){}})}},
+  replaceChildren(...nodes){this.children=nodes},appendChild(x){this.children.push(x)},addEventListener(){},
   set innerHTML(v){this.children=[]},showModal(){this.open=true},close(){this.open=false}}; }
 const document = {getElementById:id=>els[id]??=el(),createElement:el};
 const confirmations=[];
@@ -36,7 +41,7 @@ set('date','2026-10-02');set('time','08:30');ctx.updateExpense();
 assert.equal(read().length,2);
 assert.deepEqual(read()[0],{category:'交通',subcategory:'駐車場',amount:2500,memo:'修正',date:'2026-10-02',dateTime:'10/2 08:30'});
 assert.equal(els.total.textContent,'合計：2,550円');
-assert(els['category-totals'].children.some(e=>e.textContent==='交通：2,500円'));
+assert(els['category-totals'].children.some(e=>e.children[0].children[0].children.map(span=>span.textContent).join('')==='交通2,500円'));
 assert.equal(els['edit-dialog'].open,false);
 const saved = storage.get('expenses');
 open(0);set('amount','9999');els['edit-dialog'].close();assert.equal(storage.get('expenses'),saved);
