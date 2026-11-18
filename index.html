@@ -432,11 +432,12 @@
   // 保存済みの記録を読み込む
   let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
 
+  const TRIP_NAME_KEY = "travel-memo-trip-name";
   const tripNameInput = document.getElementById("trip-name");
-  tripNameInput.value = localStorage.getItem("travel-memo-trip-name") || "";
+  tripNameInput.value = localStorage.getItem(TRIP_NAME_KEY) || "";
   function saveTripName() {
     try {
-      localStorage.setItem("travel-memo-trip-name", tripNameInput.value);
+      localStorage.setItem(TRIP_NAME_KEY, tripNameInput.value);
     } catch {
       setDataStatus("旅行名を端末に保存できませんでした。今回の書き出しには使用できます。");
     }
@@ -884,7 +885,7 @@ item.appendChild(actions);
     deleteAllStep = 1;
     document.getElementById("delete-all-title").textContent = "すべての記録を削除しますか？";
     document.getElementById("delete-all-message").textContent =
-      "この操作を行うと、現在保存されている支出記録がすべて削除されます。集計やバックアップが完了していることを確認してください。";
+      "このブラウザーに保存された支出記録、復元前の記録、旅行名を削除します。必要な記録は先に書き出してください。";
     document.getElementById("delete-all-confirm").textContent = "削除へ進む";
     document.getElementById("delete-all-dialog").showModal();
   }
@@ -903,7 +904,20 @@ item.appendChild(actions);
     if (deleteAllStep !== 2) return;
     deleteAllStep = 0;
     dialog.close();
-    saveExpenses([]);
+    cancelRestore();
+    try {
+      localStorage.removeItem(RECOVERY_KEY);
+      document.getElementById("undo-restore").hidden = true;
+      localStorage.removeItem(TRIP_NAME_KEY);
+      tripNameInput.value = "";
+      localStorage.removeItem("expenses");
+    } catch {
+      setDataStatus("一括削除を完了できませんでした。ブラウザーの設定を確認して、もう一度お試しください。");
+      return;
+    }
+    expenses = [];
+    displayExpenses();
+    setDataStatus("支出記録、復元前の記録、旅行名を削除しました。");
   }
 
   function setDataStatus(message) {

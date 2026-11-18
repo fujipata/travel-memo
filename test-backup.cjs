@@ -11,18 +11,20 @@ const fixtures = [
   {category:'食事',amount:100,memo:'日付なし'}
 ];
 function harness(records=fixtures, storage=new Map()) {
-  if (!storage.has('expenses')) storage.set('expenses',JSON.stringify(records));
+  if (records && !storage.has('expenses')) storage.set('expenses',JSON.stringify(records));
   const els = {}, downloads=[], shared=[], alerts=[];
   function el(){return {value:'',hidden:false,children:[],setAttribute(k,v){this[k]=v},
   get firstChild(){return {textContent:this.textContent}},
   append(...nodes){this.children.push(...nodes)},
   querySelector(selector){return this.children.find(child=>'.'+child.className===selector)},
   cloneNode(){return {...this, firstChild:this.firstChild, querySelector:()=>({remove(){}})}},
-  replaceChildren(...nodes){this.children=nodes},appendChild(x){this.children.push(x)},listeners:{},addEventListener(name,listener){this.listeners[name]=listener},set innerHTML(v){this.children=[]},click(){downloads.push(this.download)},remove(){}}}
+  replaceChildren(...nodes){this.children=nodes},appendChild(x){this.children.push(x)},listeners:{},addEventListener(name,listener){this.listeners[name]=listener},set innerHTML(v){this.children=[]},click(){downloads.push(this.download)},remove(){},
+  showModal(){this.open=true},close(){this.open=false},focus(){}}}
   const document={getElementById(id){return els[id]??=el()},createElement:el,body:el()};
   const env={document,File:globalThis.File,Date,console,confirm:()=>true,alert:m=>alerts.push(m),
     navigator:{canShare:()=>true,share:async x=>shared.push(x)},URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},setTimeout:f=>f(),clearTimeout(){},
-    localStorage:{getItem:k=>storage.get(k)??null,setItem(k,v){if(env.failKey===k)throw Error('quota');storage.set(k,v)}}};
+    localStorage:{getItem:k=>storage.get(k)??null,setItem(k,v){if(env.failKey===k)throw Error('quota');storage.set(k,v)},
+    removeItem(k){if(env.failRemoveKey===k)throw Error('storage');storage.delete(k)}}};
   const ctx=vm.createContext(env); vm.runInContext(source,ctx);
   return {ctx,els,storage,env,downloads,shared,alerts};
 }
@@ -115,6 +117,42 @@ function cards(h) {
  assert.equal(cleared.els['trip-name'].value, '');
  await cleared.ctx.exportRecords('csv');
  assert.match(cleared.shared[0].files[0].name, /^travel-memo-.*\.csv$/);
+
+ // Bulk deletion must erase both records, the trip name, and any pending restore.
+ const bulk = harness();
+ bulk.els['trip-name'].value = '北海道旅行';
+ bulk.els['trip-name'].listeners.input();
+ const bulkBackup = bulk.ctx.makeBackup([fixtures[0]]);
+ await bulk.ctx.previewRestore({target:{files:[{size:1,text:async()=>bulkBackup}]}});
+ bulk.ctx.applyRestore();
+ await bulk.ctx.previewRestore({target:{files:[{size:1,text:async()=>bulkBackup}]}});
+ bulk.storage.set('unrelated-app', 'keep');
+
+ bulk.ctx.startDeleteAll();
+ bulk.ctx.confirmDeleteAll();
+ assert(bulk.storage.has('expenses-before-restore'));
+ assert.equal(bulk.els['trip-name'].value, '北海道旅行');
+ bulk.env.failRemoveKey = 'expenses';
+ bulk.ctx.confirmDeleteAll();
+ assert(bulk.storage.has('expenses'));
+ assert.match(bulk.els['data-status'].textContent, /完了できませんでした/);
+
+ bulk.env.failRemoveKey = null;
+ bulk.ctx.startDeleteAll();
+ bulk.ctx.confirmDeleteAll();
+ bulk.ctx.confirmDeleteAll();
+ bulk.ctx.applyRestore();
+ assert.deepEqual([...bulk.storage], [['unrelated-app', 'keep']]);
+ assert.equal(bulk.els['restore-preview'].hidden, true);
+ assert.equal(bulk.els['undo-restore'].hidden, true);
+ assert.equal(bulk.els['trip-name'].value, '');
+ assert.equal(bulk.els.total.textContent, '合計：0円');
+ const afterDelete = harness(null, bulk.storage);
+ assert.equal(afterDelete.els.total.textContent, '合計：0円');
+ assert.equal(afterDelete.els['undo-restore'].hidden, true);
+ assert.equal(afterDelete.els['trip-name'].value, '');
+ await afterDelete.ctx.exportRecords('backup');
+ assert.match(afterDelete.shared[0].files[0].name, /^travel-memo-.*\.json$/);
 
  // Mac backup routing must not change mobile sharing, CSV, or stored records.
  for (const [platform,maxTouchPoints] of [['iPhone',5],['iPad',5],['MacIntel',5],['Win32',0],['Linux armv8l',5]]) {
