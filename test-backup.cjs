@@ -13,7 +13,7 @@ const fixtures = [
 function harness(records=fixtures, storage=new Map()) {
   if (records && !storage.has('expenses')) storage.set('expenses',JSON.stringify(records));
   const els = {}, downloads=[], shared=[], alerts=[];
-  function el(){return {value:'',hidden:false,children:[],setAttribute(k,v){this[k]=v},
+  function el(){return {value:'',maxLength:60,hidden:false,children:[],setAttribute(k,v){this[k]=v},
   get firstChild(){return {textContent:this.textContent}},
   append(...nodes){this.children.push(...nodes)},
   querySelector(selector){return this.children.find(child=>'.'+child.className===selector)},
@@ -49,7 +49,7 @@ function cards(h) {
    assert.equal(records.at(-1).subcategory,subcategory);
    assert.equal(records.at(-1).category,category);
    assert(cards(h).some(item => item.textContent.includes(category+' / '+subcategory)));
-   assert.deepEqual(JSON.parse(JSON.stringify(c.parseBackup(c.makeBackup(records)))),records);
+   assert.deepEqual(JSON.parse(JSON.stringify(c.parseBackup(c.makeBackup(records)).records)),records);
    assert(c.makeCsv(records).includes('"'+subcategory+'"'));
   }
  }
@@ -75,7 +75,7 @@ function cards(h) {
  let h=harness(),c=h.ctx;
  const original=h.storage.get('expenses');
  const backup=c.makeBackup(fixtures);
- assert.equal(JSON.stringify(c.parseBackup(backup)),JSON.stringify(fixtures.map(({category,amount,memo,date,dateTime})=>({category,amount,memo,...(date?{date}:{}),...(dateTime?{dateTime}:{})}))));
+ assert.equal(JSON.stringify(c.parseBackup(backup).records),JSON.stringify(fixtures.map(({category,amount,memo,date,dateTime})=>({category,amount,memo,...(date?{date}:{}),...(dateTime?{dateTime}:{})}))));
  const csv=c.makeCsv(fixtures);
  assert(csv.startsWith('\uFEFF"日付"'));assert(csv.includes('"昼食,""定食""\nお茶"'));assert(csv.includes('"\'=1+1"'));assert(csv.includes('"金額（円）"'));assert(csv.includes('"年不明：09/30"'));assert(csv.includes('"日付不明"'));
  for(const s of ['+1','-1','@SUM(A1)','\t=1',' \n=1']) assert(c.csvCell(s).startsWith('"\''));
@@ -117,6 +117,38 @@ function cards(h) {
  assert.equal(cleared.els['trip-name'].value, '');
  await cleared.ctx.exportRecords('csv');
  assert.match(cleared.shared[0].files[0].name, /^travel-memo-.*\.csv$/);
+
+ // Restore the original name from the JSON, regardless of the selected filename.
+ const target = harness();
+ target.els['trip-name'].value = '復元前の旅行';
+ target.els['trip-name'].listeners.input();
+ const namedBackup = await reopened.shared[1].files[0].text();
+ const restore = async (app, contents) => app.ctx.previewRestore({
+   target:{files:[{name:'renamed.json',size:contents.length,text:async()=>contents}]}
+ });
+ assert.equal(JSON.parse(namedBackup).tripName, '北海道/旅行');
+ await restore(target, namedBackup);
+ assert.match(target.els['restore-summary'].textContent, /北海道\/旅行/);
+ target.env.failKey = 'expenses';
+ target.ctx.applyRestore();
+ assert.equal(target.storage.get('travel-memo-trip-name'), '復元前の旅行');
+ target.env.failKey = null;
+ target.ctx.applyRestore();
+ const restored = harness(null, target.storage);
+ assert.equal(restored.els['trip-name'].value, '北海道/旅行');
+ await restored.ctx.exportRecords('csv');
+ assert.match(restored.shared[0].files[0].name, /^北海道-旅行-.*\.csv$/);
+ restored.ctx.undoRestore();
+ assert.equal(restored.els['trip-name'].value, '復元前の旅行');
+ const legacy = {app:'travel-memo',version:1,expenses:[]};
+ await restore(restored, JSON.stringify(legacy));
+ restored.ctx.applyRestore();
+ assert.equal(restored.els['trip-name'].value, '復元前の旅行');
+ assert.equal(restored.els.total.textContent, '合計：0円');
+ await restore(restored, JSON.stringify({...legacy,tripName:''}));
+ restored.ctx.applyRestore();
+ assert.equal(restored.els['trip-name'].value, '');
+ assert.throws(() => restored.ctx.parseBackup(JSON.stringify({...legacy,tripName:42})));
 
  // Bulk deletion must erase both records, the trip name, and any pending restore.
  const bulk = harness();

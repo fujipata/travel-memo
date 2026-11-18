@@ -961,7 +961,7 @@ item.appendChild(actions);
   }
 
   function makeBackup(records) {
-    return JSON.stringify({app: BACKUP_APP, version: 1, exportedAt: new Date().toISOString(), expenses: records}, null, 2);
+    return JSON.stringify({app: BACKUP_APP, version: 1, exportedAt: new Date().toISOString(), tripName: tripNameInput.value, expenses: records}, null, 2);
   }
 
   async function exportRecords(kind) {
@@ -1012,7 +1012,11 @@ item.appendChild(actions);
         !Array.isArray(data.expenses) || data.expenses.length > 10000) {
       throw new Error("このアプリのバックアップではありません。");
     }
-    return data.expenses.map(item => {
+    if (data.tripName !== undefined &&
+        (typeof data.tripName !== "string" || data.tripName.length > tripNameInput.maxLength)) {
+      throw new Error("旅行名の形式が正しくありません。");
+    }
+    const records = data.expenses.map(item => {
       if (!item || typeof item !== "object" ||
           typeof item.category !== "string" || !item.category.trim() || item.category.length > 100 ||
           typeof item.amount !== "number" || !Number.isFinite(item.amount) || item.amount <= 0 ||
@@ -1037,6 +1041,7 @@ item.appendChild(actions);
       if (item.dateTime !== undefined) clean.dateTime = item.dateTime;
       return clean;
     });
+    return {records, tripName: data.tripName};
   }
 
   function cancelRestore() {
@@ -1056,12 +1061,15 @@ item.appendChild(actions);
       if (file.size > 5 * 1024 * 1024) throw new Error("ファイルは5MB以下にしてください。");
       const text = await file.text();
       if (readId !== restoreReadId) return;
-      const records = parseBackup(text);
-      pendingRestore = records;
+      const backup = parseBackup(text);
+      const {records, tripName} = backup;
       const total = records.reduce((sum, item) => sum + item.amount, 0);
       if (!Number.isFinite(total) || total > Number.MAX_SAFE_INTEGER) throw new Error("合計金額が大きすぎます。");
+      pendingRestore = backup;
       document.getElementById("restore-summary").textContent =
-        records.length + "件・合計" + total.toLocaleString("ja-JP") + "円の記録で、現在の記録をすべて置き換えます。追加ではありません。";
+        records.length + "件・合計" + total.toLocaleString("ja-JP") + "円の記録で、現在の記録をすべて置き換えます。" +
+        (tripName === undefined ? " このバックアップに旅行名は含まれていません。" :
+          tripName ? " 旅行名は「" + tripName + "」になります。" : " 旅行名は空欄になります。");
       document.getElementById("restore-preview").hidden = false;
       setDataStatus("内容を確認し、復元する場合は「この内容で置き換える」を押してください。");
     } catch (error) {
@@ -1072,9 +1080,33 @@ item.appendChild(actions);
     }
   }
 
+  function saveRestoredBackup({records, tripName}) {
+    if (tripName === undefined) return saveExpenses(records);
+    let previousName;
+    try {
+      previousName = localStorage.getItem(TRIP_NAME_KEY);
+      localStorage.setItem(TRIP_NAME_KEY, tripName);
+    } catch {
+      setDataStatus("旅行名を保存できないため、復元を中止しました。");
+      return false;
+    }
+    if (!saveExpenses(records)) {
+      try {
+        if (previousName === null) localStorage.removeItem(TRIP_NAME_KEY);
+        else localStorage.setItem(TRIP_NAME_KEY, previousName);
+      } catch {
+        tripNameInput.value = tripName;
+        setDataStatus("支出記録を保存できませんでした。旅行名だけが変更されました。");
+      }
+      return false;
+    }
+    tripNameInput.value = tripName;
+    return true;
+  }
+
   function applyRestore() {
     if (pendingRestore === null) return;
-    if (!confirm("現在の" + expenses.length + "件を、バックアップの" + pendingRestore.length + "件に置き換えますか？")) return;
+    if (!confirm("現在の" + expenses.length + "件を、バックアップの" + pendingRestore.records.length + "件に置き換えますか？")) return;
     try {
       // 現在の記録を保存できない場合は、置き換えを行わない
       localStorage.setItem(RECOVERY_KEY, makeBackup(expenses));
@@ -1083,16 +1115,16 @@ item.appendChild(actions);
       return;
     }
     document.getElementById("undo-restore").hidden = false;
-    if (!saveExpenses(pendingRestore)) return;
+    if (!saveRestoredBackup(pendingRestore)) return;
     cancelRestore();
     setDataStatus("復元しました。直前の記録へ戻すボタンも利用できます。");
   }
 
   function undoRestore() {
     try {
-      const records = parseBackup(localStorage.getItem(RECOVERY_KEY));
-      if (!confirm("現在の記録を、復元する直前の" + records.length + "件に戻しますか？復元後に追加した記録も置き換わります。")) return;
-      if (!saveExpenses(records)) return;
+      const backup = parseBackup(localStorage.getItem(RECOVERY_KEY));
+      if (!confirm("現在の記録を、復元する直前の" + backup.records.length + "件に戻しますか？復元後に追加した記録も置き換わります。")) return;
+      if (!saveRestoredBackup(backup)) return;
       cancelRestore();
       setDataStatus("復元する直前の記録に戻しました。");
     } catch (error) {
